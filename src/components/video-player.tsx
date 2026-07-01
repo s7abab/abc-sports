@@ -12,6 +12,8 @@ interface VideoPlayerProps {
   onPlay?: () => void;
   onPause?: () => void;
   children?: React.ReactNode;
+  muted?: boolean;
+  autoPlay?: boolean;
 }
 
 const PIPToggle = () => {
@@ -46,7 +48,7 @@ const PIPToggle = () => {
 };
 
 export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
-  ({ src, title, poster, thumbnails, onPlay, onPause, children }, ref) => {
+  ({ src, title, poster, thumbnails, onPlay, onPause, children, muted = false, autoPlay = false }, ref) => {
     const [objectFit, setObjectFit] = useState<"contain" | "fill">("contain");
 
     const toggleFit = () => {
@@ -81,6 +83,8 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
           onPause={onPause}
           onProviderChange={handleProviderChange}
           data-fit={objectFit}
+          muted={muted}
+          autoPlay={autoPlay}
         >
           <MediaProvider>
             {poster && (
