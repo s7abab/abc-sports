@@ -18,10 +18,6 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
   ({ src, title, poster, thumbnails, onPlay, onPause, children }, ref) => {
     const [objectFit, setObjectFit] = useState<"contain" | "cover">("contain");
 
-    const fitClass = objectFit === "cover" 
-      ? "[&_video]:!object-cover [&_img]:!object-cover" 
-      : "[&_video]:!object-contain [&_img]:!object-contain";
-
     const toggleFit = () => {
       setObjectFit((prev) => (prev === "contain" ? "cover" : "contain"));
     };
@@ -35,9 +31,9 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
     };
 
     return (
-      <div className={`relative w-full aspect-video rounded-2xl overflow-hidden bg-black/95 border border-white/10 shadow-2xl backdrop-blur-md transition-all duration-300 hover:border-violet-500/30 group ${fitClass}`}>
+      <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black/95 border border-white/10 shadow-2xl backdrop-blur-md transition-all duration-300 hover:border-violet-500/30 group">
         <MediaPlayer
-          className="w-full h-full object-cover select-none outline-none"
+          className="w-full h-full select-none outline-none"
           title={title}
           src={src}
           crossOrigin="anonymous"
@@ -47,13 +43,14 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
           onPlay={onPlay}
           onPause={onPause}
           onProviderChange={handleProviderChange}
+          data-fit={objectFit}
         >
           <MediaProvider>
             {poster && (
               <Poster
                 src={poster}
                 alt={title}
-                className="absolute inset-0 w-full h-full object-cover opacity-0 data-[visible]:opacity-100 transition-opacity duration-500 z-10"
+                className="absolute inset-0 w-full h-full opacity-0 data-[visible]:opacity-100 transition-opacity duration-500 z-10"
               />
             )}
           </MediaProvider>
