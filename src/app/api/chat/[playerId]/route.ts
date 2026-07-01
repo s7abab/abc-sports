@@ -12,7 +12,7 @@ export async function GET(request: Request, context: { params: Promise<{ playerI
     const after = url.searchParams.get("after");
 
     return NextResponse.json({
-      messages: readChatMessages(playerId, after),
+      messages: await readChatMessages(playerId, after),
     });
   } catch (error: unknown) {
     console.error("Error reading live chat:", error);
@@ -24,7 +24,7 @@ export async function POST(request: Request, context: { params: Promise<{ player
   try {
     const { playerId } = await context.params;
     const payload = await request.json();
-    const message = createChatMessage(playerId, payload);
+    const message = await createChatMessage(playerId, payload);
 
     return NextResponse.json({ success: true, message });
   } catch (error: unknown) {

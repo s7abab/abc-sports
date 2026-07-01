@@ -8,10 +8,10 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
   try {
     const { id } = await context.params;
     const payload = await request.json();
-    const match = updateMatch(id, payload);
+    const match = await updateMatch(id, payload);
     return NextResponse.json({ success: true, match });
   } catch (error: unknown) {
-    console.error("Error updating match in SQLite:", error);
+    console.error("Error updating match:", error);
     return NextResponse.json({ error: "Failed to update match" }, { status: 500 });
   }
 }
@@ -19,10 +19,10 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
 export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
-    deleteMatch(id);
+    await deleteMatch(id);
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
-    console.error("Error deleting match from SQLite:", error);
+    console.error("Error deleting match:", error);
     return NextResponse.json({ error: "Failed to delete match" }, { status: 500 });
   }
 }

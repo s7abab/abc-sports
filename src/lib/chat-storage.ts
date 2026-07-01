@@ -1,7 +1,6 @@
-import fs from "fs";
-import path from "path";
-import { execFileSync } from "child_process";
 import { randomUUID } from "crypto";
+
+import { getSupabaseStorageClient } from "@/lib/supabase-storage";
 
 export type ChatMessageKind = "message" | "reaction";
 
@@ -14,95 +13,9 @@ export interface ChatMessage {
   createdAt: string;
 }
 
-interface ChatMessageRow {
-  id: string;
-  playerId: string;
-  author: string;
-  body: string;
-  kind: string;
-  createdAt: string;
-}
-
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_PATH = path.join(DATA_DIR, "chat.sqlite");
 const MAX_BODY_LENGTH = 280;
 const MAX_AUTHOR_LENGTH = 28;
 const MAX_ROOM_MESSAGES = 400;
-
-let databaseInitialized = false;
-let sqliteAvailable: boolean | null = null;
-
-const memoryStore = globalThis as typeof globalThis & {
-  __abcSportsChatMessages?: ChatMessage[];
-};
-
-function canUseSqlite() {
-  if (sqliteAvailable !== null) {
-    return sqliteAvailable;
-  }
-
-  try {
-    execFileSync("sqlite3", ["-version"], { stdio: "ignore" });
-    sqliteAvailable = true;
-  } catch {
-    sqliteAvailable = false;
-  }
-
-  return sqliteAvailable;
-}
-
-function ensureMemoryStore() {
-  memoryStore.__abcSportsChatMessages ??= [];
-}
-
-function ensureDatabase() {
-  if (databaseInitialized) {
-    return;
-  }
-
-  if (!canUseSqlite()) {
-    ensureMemoryStore();
-    databaseInitialized = true;
-    return;
-  }
-
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  runSqlite(`
-    CREATE TABLE IF NOT EXISTS chat_messages (
-      id TEXT PRIMARY KEY,
-      playerId TEXT NOT NULL,
-      author TEXT NOT NULL,
-      body TEXT NOT NULL,
-      kind TEXT NOT NULL DEFAULT 'message',
-      createdAt TEXT NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS chat_messages_room_created_idx
-      ON chat_messages (playerId, createdAt);
-  `);
-
-  databaseInitialized = true;
-}
-
-function runSqlite(sql: string): string {
-  return execFileSync("sqlite3", ["-batch", "-json", DB_PATH], {
-    input: sql,
-    encoding: "utf8",
-  });
-}
-
-function querySqlite<T>(sql: string): T[] {
-  const output = runSqlite(sql).trim();
-  if (!output) {
-    return [];
-  }
-
-  return JSON.parse(output) as T[];
-}
-
-function sqlString(value: string): string {
-  return `'${value.replace(/'/g, "''")}'`;
-}
 
 function normalizeKind(value: unknown): ChatMessageKind {
   return value === "reaction" ? "reaction" : "message";
@@ -125,86 +38,43 @@ function normalizeBody(value: unknown): string {
   return value.replace(/\s+/g, " ").trim().slice(0, MAX_BODY_LENGTH);
 }
 
-function mapRow(row: ChatMessageRow): ChatMessage {
-  return {
-    id: row.id,
-    playerId: row.playerId,
-    author: row.author,
-    body: row.body,
-    kind: normalizeKind(row.kind),
-    createdAt: row.createdAt,
-  };
-}
-
-function pruneRoom(playerId: string) {
-  if (!canUseSqlite()) {
-    ensureMemoryStore();
-    const messages = memoryStore.__abcSportsChatMessages ?? [];
-    const roomMessages = messages
-      .filter((message) => message.playerId === playerId)
-      .sort((first, second) => new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime())
-      .slice(0, MAX_ROOM_MESSAGES);
-    const keepIds = new Set(roomMessages.map((message) => message.id));
-    memoryStore.__abcSportsChatMessages = messages.filter(
-      (message) => message.playerId !== playerId || keepIds.has(message.id)
-    );
-    return;
-  }
-
-  runSqlite(`
-    DELETE FROM chat_messages
-    WHERE playerId = ${sqlString(playerId)}
-      AND id NOT IN (
-        SELECT id FROM chat_messages
-        WHERE playerId = ${sqlString(playerId)}
-        ORDER BY createdAt DESC
-        LIMIT ${MAX_ROOM_MESSAGES}
-      );
-  `);
-}
-
-export function readChatMessages(playerId: string, after?: string | null): ChatMessage[] {
-  ensureDatabase();
-
+export async function readChatMessages(playerId: string, after?: string | null): Promise<ChatMessage[]> {
   const trimmedPlayerId = playerId.trim();
   if (!trimmedPlayerId) {
     return [];
   }
 
-  if (!canUseSqlite()) {
-    ensureMemoryStore();
-    const afterTime = after ? new Date(after).getTime() : 0;
-    return (memoryStore.__abcSportsChatMessages ?? [])
-      .filter((message) => {
-        if (message.playerId !== trimmedPlayerId) {
-          return false;
-        }
+  let query = getSupabaseStorageClient()
+    .from("chat_messages")
+    .select("id, player_id, author, body, kind, created_at")
+    .eq("player_id", trimmedPlayerId)
+    .order("created_at", { ascending: true })
+    .limit(100);
 
-        return afterTime ? new Date(message.createdAt).getTime() > afterTime : true;
-      })
-      .sort((first, second) => new Date(first.createdAt).getTime() - new Date(second.createdAt).getTime())
-      .slice(0, 100);
+  if (after) {
+    query = query.gt("created_at", after);
   }
 
-  const afterClause = after ? `AND createdAt > ${sqlString(after)}` : "";
-  const rows = querySqlite<ChatMessageRow>(`
-    SELECT id, playerId, author, body, kind, createdAt
-    FROM chat_messages
-    WHERE playerId = ${sqlString(trimmedPlayerId)}
-      ${afterClause}
-    ORDER BY createdAt ASC
-    LIMIT 100;
-  `);
+  const { data, error } = await query;
 
-  return rows.map(mapRow);
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    playerId: row.player_id,
+    author: row.author,
+    body: row.body,
+    kind: normalizeKind(row.kind),
+    createdAt: new Date(row.created_at).toISOString(),
+  }));
 }
 
-export function createChatMessage(
+export async function createChatMessage(
   playerId: string,
   input: { author?: unknown; body?: unknown; kind?: unknown }
-): ChatMessage {
-  ensureDatabase();
-
+): Promise<ChatMessage> {
   const trimmedPlayerId = playerId.trim();
   const body = normalizeBody(input.body);
 
@@ -225,25 +95,42 @@ export function createChatMessage(
     createdAt: new Date().toISOString(),
   };
 
-  if (!canUseSqlite()) {
-    ensureMemoryStore();
-    memoryStore.__abcSportsChatMessages = [...(memoryStore.__abcSportsChatMessages ?? []), message];
-    pruneRoom(trimmedPlayerId);
-    return message;
+  const supabase = getSupabaseStorageClient();
+  const { error } = await supabase.from("chat_messages").insert({
+    id: message.id,
+    player_id: message.playerId,
+    author: message.author,
+    body: message.body,
+    kind: message.kind,
+    created_at: message.createdAt,
+  });
+
+  if (error) {
+    throw error;
   }
 
-  runSqlite(`
-    INSERT INTO chat_messages (id, playerId, author, body, kind, createdAt)
-    VALUES (
-      ${sqlString(message.id)},
-      ${sqlString(message.playerId)},
-      ${sqlString(message.author)},
-      ${sqlString(message.body)},
-      ${sqlString(message.kind)},
-      ${sqlString(message.createdAt)}
-    );
-  `);
-  pruneRoom(trimmedPlayerId);
+  const { data: oldMessages, error: oldMessagesError } = await supabase
+    .from("chat_messages")
+    .select("id")
+    .eq("player_id", trimmedPlayerId)
+    .order("created_at", { ascending: false })
+    .range(MAX_ROOM_MESSAGES, MAX_ROOM_MESSAGES + 100);
+
+  if (oldMessagesError) {
+    throw oldMessagesError;
+  }
+
+  const oldIds = (oldMessages ?? []).map((item) => item.id);
+  if (oldIds.length > 0) {
+    const { error: pruneError } = await supabase
+      .from("chat_messages")
+      .delete()
+      .in("id", oldIds);
+
+    if (pruneError) {
+      throw pruneError;
+    }
+  }
 
   return message;
 }

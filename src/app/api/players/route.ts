@@ -8,7 +8,7 @@ export async function GET() {
   try {
     return NextResponse.json(await readPlayers());
   } catch (error: unknown) {
-    console.error("Error reading players from SQLite:", error);
+    console.error("Error reading players:", error);
     return NextResponse.json(
       { error: "Failed to read player configuration" },
       { status: 500 }
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     const players = await savePlayers(updatedPlayers);
     return NextResponse.json({ success: true, players });
   } catch (error: unknown) {
-    console.error("Error writing players to SQLite:", error);
+    console.error("Error writing players:", error);
     return NextResponse.json(
       { error: "Failed to write player configuration" },
       { status: 500 }

@@ -1,53 +1,37 @@
 import { createServer } from "http";
-import { execFileSync } from "child_process";
 import { randomUUID, createHash } from "crypto";
-import fs from "fs";
-import path from "path";
 import next from "next";
+import { createClient } from "@supabase/supabase-js";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = process.env.HOSTNAME || "0.0.0.0";
 const port = parseInt(process.env.PORT || "3000", 10);
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_PATH = path.join(DATA_DIR, "chat.sqlite");
 const CHAT_SOCKET_PATH = "/api/chat/socket";
 const MAX_BODY_LENGTH = 280;
 const MAX_AUTHOR_LENGTH = 28;
 const MAX_ROOM_MESSAGES = 400;
 
 const rooms = new Map();
+let supabase = null;
 
-function runSqlite(sql) {
-  return execFileSync("sqlite3", ["-batch", "-json", DB_PATH], {
-    input: sql,
-    encoding: "utf8",
-  });
-}
+function getSupabaseStorageClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-function querySqlite(sql) {
-  const output = runSqlite(sql).trim();
-  return output ? JSON.parse(output) : [];
-}
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error("Supabase environment variables are not configured.");
+  }
 
-function sqlString(value) {
-  return `'${String(value).replace(/'/g, "''")}'`;
-}
+  if (!supabase) {
+    supabase = createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
+  }
 
-function ensureChatDatabase() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  runSqlite(`
-    CREATE TABLE IF NOT EXISTS chat_messages (
-      id TEXT PRIMARY KEY,
-      playerId TEXT NOT NULL,
-      author TEXT NOT NULL,
-      body TEXT NOT NULL,
-      kind TEXT NOT NULL DEFAULT 'message',
-      createdAt TEXT NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS chat_messages_room_created_idx
-      ON chat_messages (playerId, createdAt);
-  `);
+  return supabase;
 }
 
 function normalizeAuthor(value) {
@@ -71,20 +55,32 @@ function normalizeKind(value) {
   return value === "reaction" ? "reaction" : "message";
 }
 
-function pruneRoom(playerId) {
-  runSqlite(`
-    DELETE FROM chat_messages
-    WHERE playerId = ${sqlString(playerId)}
-      AND id NOT IN (
-        SELECT id FROM chat_messages
-        WHERE playerId = ${sqlString(playerId)}
-        ORDER BY createdAt DESC
-        LIMIT ${MAX_ROOM_MESSAGES}
-      );
-  `);
+async function pruneRoom(playerId) {
+  const { data, error } = await getSupabaseStorageClient()
+    .from("chat_messages")
+    .select("id")
+    .eq("player_id", playerId)
+    .order("created_at", { ascending: false })
+    .range(MAX_ROOM_MESSAGES, MAX_ROOM_MESSAGES + 100);
+
+  if (error) {
+    throw error;
+  }
+
+  const oldIds = (data ?? []).map((item) => item.id);
+  if (oldIds.length > 0) {
+    const { error: deleteError } = await getSupabaseStorageClient()
+      .from("chat_messages")
+      .delete()
+      .in("id", oldIds);
+
+    if (deleteError) {
+      throw deleteError;
+    }
+  }
 }
 
-function createChatMessage(playerId, input) {
+async function createChatMessage(playerId, input) {
   const body = normalizeBody(input.body);
   if (!playerId || !body) {
     return null;
@@ -99,30 +95,44 @@ function createChatMessage(playerId, input) {
     createdAt: new Date().toISOString(),
   };
 
-  runSqlite(`
-    INSERT INTO chat_messages (id, playerId, author, body, kind, createdAt)
-    VALUES (
-      ${sqlString(message.id)},
-      ${sqlString(message.playerId)},
-      ${sqlString(message.author)},
-      ${sqlString(message.body)},
-      ${sqlString(message.kind)},
-      ${sqlString(message.createdAt)}
-    );
-  `);
-  pruneRoom(playerId);
+  const { error } = await getSupabaseStorageClient().from("chat_messages").insert({
+    id: message.id,
+    player_id: message.playerId,
+    author: message.author,
+    body: message.body,
+    kind: message.kind,
+    created_at: message.createdAt,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  await pruneRoom(playerId);
 
   return message;
 }
 
-function readRecentMessages(playerId) {
-  return querySqlite(`
-    SELECT id, playerId, author, body, kind, createdAt
-    FROM chat_messages
-    WHERE playerId = ${sqlString(playerId)}
-    ORDER BY createdAt DESC
-    LIMIT 60;
-  `).reverse();
+async function readRecentMessages(playerId) {
+  const { data, error } = await getSupabaseStorageClient()
+    .from("chat_messages")
+    .select("id, player_id, author, body, kind, created_at")
+    .eq("player_id", playerId)
+    .order("created_at", { ascending: false })
+    .limit(60);
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).reverse().map((row) => ({
+    id: row.id,
+    playerId: row.player_id,
+    author: row.author,
+    body: row.body,
+    kind: normalizeKind(row.kind),
+    createdAt: new Date(row.created_at).toISOString(),
+  }));
 }
 
 function encodeFrame(payload) {
@@ -228,7 +238,7 @@ function removeSocket(socket) {
   }
 }
 
-function handleChatUpgrade(req, socket) {
+async function handleChatUpgrade(req, socket) {
   const key = req.headers["sec-websocket-key"];
   if (!key) {
     socket.destroy();
@@ -263,12 +273,16 @@ function handleChatUpgrade(req, socket) {
   }
   rooms.get(playerId).add(socket);
 
-  sendJson(socket, {
-    type: "history",
-    messages: readRecentMessages(playerId),
-  });
+  try {
+    sendJson(socket, {
+      type: "history",
+      messages: await readRecentMessages(playerId),
+    });
+  } catch {
+    sendJson(socket, { type: "error", error: "Chat history is unavailable." });
+  }
 
-  socket.on("data", (chunk) => {
+  socket.on("data", async (chunk) => {
     for (const rawMessage of decodeFrames(socket, chunk)) {
       try {
         const payload = JSON.parse(rawMessage);
@@ -276,12 +290,12 @@ function handleChatUpgrade(req, socket) {
           continue;
         }
 
-        const message = createChatMessage(playerId, payload);
+        const message = await createChatMessage(playerId, payload);
         if (message) {
           broadcast(playerId, { type: "message", message });
         }
       } catch {
-        sendJson(socket, { type: "error", error: "Invalid chat payload." });
+        sendJson(socket, { type: "error", error: "Message not sent." });
       }
     }
   });
@@ -290,8 +304,6 @@ function handleChatUpgrade(req, socket) {
   socket.on("end", () => removeSocket(socket));
   socket.on("error", () => removeSocket(socket));
 }
-
-ensureChatDatabase();
 
 const server = createServer();
 const app = next({ dev, hostname, port, httpServer: server });
@@ -305,7 +317,7 @@ app.prepare().then(() => {
   server.on("upgrade", (req, socket) => {
     const requestUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
     if (requestUrl.pathname === CHAT_SOCKET_PATH) {
-      handleChatUpgrade(req, socket);
+      handleChatUpgrade(req, socket).catch(() => socket.destroy());
     }
   });
 

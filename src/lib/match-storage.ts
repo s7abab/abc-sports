@@ -1,6 +1,3 @@
-import fs from "fs";
-import path from "path";
-import { execFileSync } from "child_process";
 import { randomUUID } from "crypto";
 
 import {
@@ -8,6 +5,7 @@ import {
   type MatchStatus,
   normalizeMatchDateTime,
 } from "@/lib/match-utils";
+import { getSupabaseStorageClient } from "@/lib/supabase-storage";
 
 export interface MatchConfig {
   id: string;
@@ -21,23 +19,6 @@ export interface MatchConfig {
   homeLogoUrl: string;
   awayLogoUrl: string;
 }
-
-interface MatchRow {
-  id: string;
-  position: number;
-  live: number;
-  status: string | null;
-  competition: string;
-  date: string;
-  home: string;
-  away: string;
-  playerId: string;
-  homeLogoUrl: string | null;
-  awayLogoUrl: string | null;
-}
-
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_PATH = path.join(DATA_DIR, "matches.sqlite");
 
 const DEFAULT_MATCHES: MatchConfig[] = [
   {
@@ -90,104 +71,6 @@ const DEFAULT_MATCHES: MatchConfig[] = [
   },
 ];
 
-let databaseInitialized = false;
-let sqliteAvailable: boolean | null = null;
-
-const memoryStore = globalThis as typeof globalThis & {
-  __abcSportsMatches?: MatchConfig[];
-};
-
-function canUseSqlite() {
-  if (sqliteAvailable !== null) {
-    return sqliteAvailable;
-  }
-
-  try {
-    execFileSync("sqlite3", ["-version"], { stdio: "ignore" });
-    sqliteAvailable = true;
-  } catch {
-    sqliteAvailable = false;
-  }
-
-  return sqliteAvailable;
-}
-
-function ensureMemoryStore() {
-  if (!memoryStore.__abcSportsMatches) {
-    memoryStore.__abcSportsMatches = DEFAULT_MATCHES.map((match) => ({ ...match }));
-  }
-}
-
-function ensureDatabase() {
-  if (databaseInitialized) {
-    return;
-  }
-
-  if (!canUseSqlite()) {
-    ensureMemoryStore();
-    databaseInitialized = true;
-    return;
-  }
-
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  runSqlite(`
-    CREATE TABLE IF NOT EXISTS matches (
-      id TEXT PRIMARY KEY,
-      position INTEGER NOT NULL,
-      live INTEGER NOT NULL,
-      status TEXT NOT NULL DEFAULT 'upcoming',
-      competition TEXT NOT NULL,
-      date TEXT NOT NULL,
-      home TEXT NOT NULL,
-      away TEXT NOT NULL,
-      playerId TEXT NOT NULL DEFAULT '1',
-      homeLogoUrl TEXT NOT NULL DEFAULT '',
-      awayLogoUrl TEXT NOT NULL DEFAULT ''
-    );
-  `);
-
-  const columns = querySqlite<{ name: string }>("PRAGMA table_info(matches);");
-  if (!columns.some((column) => column.name === "status")) {
-    runSqlite("ALTER TABLE matches ADD COLUMN status TEXT NOT NULL DEFAULT 'upcoming';");
-  }
-  if (!columns.some((column) => column.name === "homeLogoUrl")) {
-    runSqlite("ALTER TABLE matches ADD COLUMN homeLogoUrl TEXT NOT NULL DEFAULT '';");
-  }
-  if (!columns.some((column) => column.name === "awayLogoUrl")) {
-    runSqlite("ALTER TABLE matches ADD COLUMN awayLogoUrl TEXT NOT NULL DEFAULT '';");
-  }
-  if (!columns.some((column) => column.name === "playerId")) {
-    runSqlite("ALTER TABLE matches ADD COLUMN playerId TEXT NOT NULL DEFAULT '1';");
-  }
-
-  const existingCount = querySqlite<{ count: number }>("SELECT COUNT(*) AS count FROM matches;");
-  if (existingCount.length === 0 || existingCount[0].count === 0) {
-    replaceMatches(DEFAULT_MATCHES);
-  }
-
-  databaseInitialized = true;
-}
-
-function runSqlite(sql: string): string {
-  return execFileSync("sqlite3", ["-batch", "-json", DB_PATH], {
-    input: sql,
-    encoding: "utf8",
-  });
-}
-
-function querySqlite<T>(sql: string): T[] {
-  const output = runSqlite(sql).trim();
-  if (!output) {
-    return [];
-  }
-
-  return JSON.parse(output) as T[];
-}
-
-function sqlString(value: string): string {
-  return `'${value.replace(/'/g, "''")}'`;
-}
-
 function normalizeMatch(value: unknown): MatchConfig | null {
   if (!value || typeof value !== "object") {
     return null;
@@ -222,84 +105,73 @@ function normalizeMatch(value: unknown): MatchConfig | null {
   };
 }
 
-function replaceMatches(matches: MatchConfig[]) {
-  if (!canUseSqlite()) {
-    memoryStore.__abcSportsMatches = matches.map((match) => ({ ...match }));
-    return;
+function toMatchRow(match: MatchConfig, position: number) {
+  return {
+    id: match.id,
+    position,
+    live: match.live,
+    status: match.status,
+    competition: match.competition,
+    date: match.date,
+    home: match.home,
+    away: match.away,
+    player_id: match.playerId,
+    home_logo_url: match.homeLogoUrl,
+    away_logo_url: match.awayLogoUrl,
+  };
+}
+
+async function seedDefaultMatchesIfEmpty() {
+  const supabase = getSupabaseStorageClient();
+  const { count, error } = await supabase
+    .from("matches")
+    .select("id", { count: "exact", head: true });
+
+  if (error) {
+    throw error;
   }
 
-  const statements = [
-    "BEGIN TRANSACTION;",
-    "DELETE FROM matches;",
-    ...matches.map(
-      (match, position) => `
-        INSERT INTO matches (id, position, live, status, competition, date, home, away, playerId, homeLogoUrl, awayLogoUrl)
-        VALUES (
-          ${sqlString(match.id)},
-          ${position},
-          ${match.live ? 1 : 0},
-          ${sqlString(match.status)},
-          ${sqlString(match.competition)},
-          ${sqlString(match.date)},
-          ${sqlString(match.home)},
-          ${sqlString(match.away)},
-          ${sqlString(match.playerId)},
-          ${sqlString(match.homeLogoUrl)},
-          ${sqlString(match.awayLogoUrl)}
-        );
-      `
-    ),
-    "COMMIT;",
-  ];
+  if (count === 0) {
+    const { error: insertError } = await supabase
+      .from("matches")
+      .insert(DEFAULT_MATCHES.map(toMatchRow));
 
-  try {
-    runSqlite(statements.join("\n"));
-  } catch (error) {
-    try {
-      runSqlite("ROLLBACK;");
-    } catch {
-      // Ignore rollback errors; the original error is the important one.
+    if (insertError) {
+      throw insertError;
     }
-    throw error;
   }
 }
 
-export function readMatches(): MatchConfig[] {
-  ensureDatabase();
+export async function readMatches(): Promise<MatchConfig[]> {
+  await seedDefaultMatchesIfEmpty();
+  const { data, error } = await getSupabaseStorageClient()
+    .from("matches")
+    .select("id, live, competition, date, home, away, player_id, home_logo_url, away_logo_url")
+    .order("position", { ascending: true });
 
-  if (!canUseSqlite()) {
-    ensureMemoryStore();
-    return (memoryStore.__abcSportsMatches ?? []).map((match) => ({
-      ...match,
-      status: deriveMatchStatus(match.date),
-    }));
+  if (error) {
+    throw error;
   }
 
-  const rows = querySqlite<MatchRow>(
-    "SELECT id, position, live, status, competition, date, home, away, playerId, homeLogoUrl, awayLogoUrl FROM matches ORDER BY position ASC;"
-  );
-
-  return rows.map((row) => ({
+  return (data ?? []).map((row) => ({
     id: row.id,
-    live: row.live === 1,
+    live: row.live,
     status: deriveMatchStatus(row.date),
     competition: row.competition,
     date: row.date,
     home: row.home,
     away: row.away,
-    playerId: row.playerId || "1",
-    homeLogoUrl: row.homeLogoUrl ?? "",
-    awayLogoUrl: row.awayLogoUrl ?? "",
+    playerId: row.player_id || "1",
+    homeLogoUrl: row.home_logo_url ?? "",
+    awayLogoUrl: row.away_logo_url ?? "",
   }));
 }
 
-export function readMatch(id: string): MatchConfig | null {
-  return readMatches().find((match) => match.id === id) ?? null;
+export async function readMatch(id: string): Promise<MatchConfig | null> {
+  return (await readMatches()).find((match) => match.id === id) ?? null;
 }
 
-export function saveMatches(input: unknown): MatchConfig[] {
-  ensureDatabase();
-
+export async function saveMatches(input: unknown): Promise<MatchConfig[]> {
   if (!Array.isArray(input)) {
     throw new Error("Invalid data format. Expected an array.");
   }
@@ -308,28 +180,38 @@ export function saveMatches(input: unknown): MatchConfig[] {
     .map((match) => normalizeMatch(match))
     .filter((match): match is MatchConfig => Boolean(match));
 
-  replaceMatches(matches);
+  const supabase = getSupabaseStorageClient();
+  const { error: deleteError } = await supabase.from("matches").delete().neq("id", "");
+  if (deleteError) {
+    throw deleteError;
+  }
+
+  if (matches.length > 0) {
+    const { error: insertError } = await supabase
+      .from("matches")
+      .insert(matches.map(toMatchRow));
+
+    if (insertError) {
+      throw insertError;
+    }
+  }
+
   return matches;
 }
 
-export function createMatch(input: unknown): MatchConfig {
-  ensureDatabase();
-
+export async function createMatch(input: unknown): Promise<MatchConfig> {
   const match = normalizeMatch(input);
   if (!match) {
     throw new Error("Invalid match payload.");
   }
 
-  const matches = readMatches();
-  const nextMatches = [...matches, match];
-  replaceMatches(nextMatches);
+  const matches = await readMatches();
+  await saveMatches([...matches, match]);
   return match;
 }
 
-export function updateMatch(id: string, input: unknown): MatchConfig {
-  ensureDatabase();
-
-  const existingMatches = readMatches();
+export async function updateMatch(id: string, input: unknown): Promise<MatchConfig> {
+  const existingMatches = await readMatches();
   const current = existingMatches.find((match) => match.id === id);
   if (!current) {
     throw new Error("Match not found.");
@@ -341,12 +223,11 @@ export function updateMatch(id: string, input: unknown): MatchConfig {
   }
 
   const nextMatches = existingMatches.map((item) => (item.id === id ? match : item));
-  replaceMatches(nextMatches);
+  await saveMatches(nextMatches);
   return match;
 }
 
-export function deleteMatch(id: string): void {
-  ensureDatabase();
-  const nextMatches = readMatches().filter((match) => match.id !== id);
-  replaceMatches(nextMatches);
+export async function deleteMatch(id: string): Promise<void> {
+  const nextMatches = (await readMatches()).filter((match) => match.id !== id);
+  await saveMatches(nextMatches);
 }

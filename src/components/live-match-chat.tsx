@@ -13,10 +13,6 @@ interface LiveMatchChatProps {
 const QUICK_REACTIONS = ["🔥", "👏", "⚽", "😱", "❤️"];
 const MAX_NAME_LENGTH = 28;
 
-function createGuestName() {
-  return `Fan ${Math.floor(1000 + Math.random() * 9000)}`;
-}
-
 function formatMessageTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -99,19 +95,6 @@ export function LiveMatchChat({ playerId, roomTitle }: LiveMatchChatProps) {
       .filter((user) => user.toLowerCase().includes(mentionQuery))
       .slice(0, 5);
   }, [knownUsers, mentionQuery]);
-
-  useEffect(() => {
-    const storedName = window.localStorage.getItem("abc-sports-chat-name");
-    const nextName = storedName || createGuestName();
-    window.localStorage.setItem("abc-sports-chat-name", nextName);
-
-    const timer = window.setTimeout(() => {
-      setViewerName(nextName);
-      setNameInput(nextName);
-    }, 0);
-
-    return () => window.clearTimeout(timer);
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -299,7 +282,6 @@ export function LiveMatchChat({ playerId, roomTitle }: LiveMatchChatProps) {
     const normalizedName = normalizeDisplayName(nextName);
     if (normalizedName) {
       setViewerName(normalizedName);
-      window.localStorage.setItem("abc-sports-chat-name", normalizedName);
     }
   }
 

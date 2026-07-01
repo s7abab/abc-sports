@@ -61,7 +61,7 @@ export default async function MatchDetailsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const match = readMatch(id);
+  const match = await readMatch(id);
 
   if (!match) {
     notFound();
