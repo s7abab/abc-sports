@@ -1,4 +1,9 @@
 @import "tailwindcss";
+@plugin "@vidstack/react/tailwind.cjs";
+
+/* Vidstack Player Styles */
+@import "@vidstack/react/player/styles/default/theme.css";
+@import "@vidstack/react/player/styles/default/layouts/video.css";
 
 :root {
   --background: #ffffff;
