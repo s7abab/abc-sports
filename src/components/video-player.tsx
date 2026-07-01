@@ -3,7 +3,7 @@
 import { MediaPlayer, MediaProvider, Poster, isHLSProvider, useMediaPlayer, useMediaStore, type MediaPlayerInstance, type MediaProviderAdapter } from "@vidstack/react";
 import { defaultLayoutIcons, DefaultVideoLayout } from "@vidstack/react/player/layouts/default";
 import { forwardRef, useState, useRef, useImperativeHandle, useEffect } from "react";
-import { MessageSquare, MessageSquareOff, Server, Loader2 } from "lucide-react";
+import { MessageSquare, MessageSquareOff, Server, Loader2, Crop } from "lucide-react";
 import { LiveMatchChat } from "@/components/live-match-chat";
 
 interface VideoPlayerProps {
@@ -58,7 +58,7 @@ const PIPToggle = () => {
 
 export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
   ({ src, title, poster, thumbnails, onPlay, onPause, children, muted = false, autoPlay = false, isChatOpen = false, onToggleChat, playerId, isMobile = false, servers = [], activeServerId, onServerChange }, ref) => {
-    const [objectFit, setObjectFit] = useState<"contain" | "fill">("contain");
+    const [objectFit, setObjectFit] = useState<"contain" | "cover" | "fill">("contain");
     const [isServerMenuOpen, setIsServerMenuOpen] = useState(false);
     const playerRef = useRef<MediaPlayerInstance>(null);
 
@@ -107,7 +107,11 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
     }, [waiting, servers, activeServerId, onServerChange]);
 
     const toggleFit = () => {
-      setObjectFit((prev) => (prev === "contain" ? "fill" : "contain"));
+      setObjectFit((prev) => {
+        if (prev === "contain") return "cover";
+        if (prev === "cover") return "fill";
+        return "contain";
+      });
     };
 
     const handleProviderChange = (provider: MediaProviderAdapter | null) => {
@@ -236,25 +240,25 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                     </button>
                   )}
                   <PIPToggle />
-                  <button
+                   <button
                     onClick={toggleFit}
-                    className="vds-button h-full aspect-square flex items-center justify-center text-slate-300 hover:text-white transition-colors duration-150 mr-1.5 cursor-pointer"
-                    title={objectFit === "contain" ? "Fill Screen (Stretch)" : "Fit Screen (Contain)"}
-                    aria-label="Toggle Fit/Fill scaling"
+                    className={`vds-button h-full aspect-square flex items-center justify-center transition-colors duration-150 mr-1.5 cursor-pointer ${
+                      objectFit === "cover"
+                        ? "text-emerald-400 hover:text-emerald-300"
+                        : objectFit === "fill"
+                        ? "text-violet-400 hover:text-violet-300"
+                        : "text-slate-300 hover:text-white"
+                    }`}
+                    title={
+                      objectFit === "contain"
+                        ? "Fit Screen (Letterbox)"
+                        : objectFit === "cover"
+                        ? "Zoom to Fill (Crop)"
+                        : "Stretch to Fill (Distort)"
+                    }
+                    aria-label="Toggle scaling mode"
                   >
-                    {objectFit === "contain" ? (
-                      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        {/* Fit Icon: letterboxed video indicator */}
-                        <rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" strokeDasharray="3 3" />
-                        <rect x="5" y="8" width="14" height="8" rx="1" fill="currentColor" stroke="currentColor" />
-                      </svg>
-                    ) : (
-                      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        {/* Fill Icon: full stretched indicator */}
-                        <rect x="2" y="5" width="20" height="14" rx="2" fill="currentColor" stroke="currentColor" />
-                        <path d="M6 12h12M12 6v12" stroke="black" strokeWidth={2.5} strokeLinecap="round" />
-                      </svg>
-                    )}
+                    <Crop className="w-[18px] h-[18px]" />
                   </button>
                 </div>
               )

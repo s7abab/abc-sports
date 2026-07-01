@@ -54,10 +54,18 @@ media-player[data-fit="contain"] video {
   object-fit: contain !important;
 }
 
+media-player[data-fit="cover"] video {
+  object-fit: cover !important;
+}
+
 media-player[data-fit="fill"] media-poster img {
   object-fit: fill !important;
 }
 
 media-player[data-fit="contain"] media-poster img {
   object-fit: contain !important;
+}
+
+media-player[data-fit="cover"] media-poster img {
+  object-fit: cover !important;
 }
