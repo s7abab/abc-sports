@@ -74,6 +74,33 @@ export function LiveMatchChat({ playerId, roomTitle, isOverlay = false, onClose 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const latestMessageTimeRef = useRef("");
+  const lastReactionSentRef = useRef<number>(0);
+
+  const [isFloatingEnabled, setIsFloatingEnabled] = useState(false);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("live_chat_float_enabled");
+    setIsFloatingEnabled(stored === "true");
+
+    const handleToggle = (event: Event) => {
+      const customEvent = event as CustomEvent<{ enabled: boolean }>;
+      setIsFloatingEnabled(customEvent.detail.enabled);
+    };
+
+    window.addEventListener("live-chat-float-toggled", handleToggle);
+    return () => {
+      window.removeEventListener("live-chat-float-toggled", handleToggle);
+    };
+  }, []);
+
+  const toggleFloating = () => {
+    const nextState = !isFloatingEnabled;
+    setIsFloatingEnabled(nextState);
+    localStorage.setItem("live_chat_float_enabled", nextState ? "true" : "false");
+    window.dispatchEvent(
+      new CustomEvent("live-chat-float-toggled", { detail: { enabled: nextState } })
+    );
+  };
 
   const knownUsers = useMemo(() => {
     const users = new Set<string>();
@@ -115,7 +142,7 @@ export function LiveMatchChat({ playerId, roomTitle, isOverlay = false, onClose 
           socket.close();
           return;
         }
-
+        console.log(`[WebSocket] Connected successfully to chat room: ${playerId}`);
         setIsSocketLive(true);
         setError("");
       });
@@ -135,6 +162,20 @@ export function LiveMatchChat({ playerId, roomTitle, isOverlay = false, onClose 
 
           if (payload.type === "message" && payload.message) {
             setMessages((current) => mergeMessages(current, [payload.message as ChatMessage]));
+            if (payload.message.kind === "reaction") {
+              console.log(`[WebSocket] Received reaction message: ${payload.message.body} (id: ${payload.message.id})`);
+              window.dispatchEvent(
+                new CustomEvent("live-chat-reaction", {
+                  detail: { id: payload.message.id, emoji: payload.message.body },
+                })
+              );
+            } else {
+              window.dispatchEvent(
+                new CustomEvent("live-chat-comment", {
+                  detail: { id: payload.message.id, author: payload.message.author, body: payload.message.body },
+                })
+              );
+            }
           }
 
           if (payload.type === "error" && payload.error) {
@@ -149,7 +190,7 @@ export function LiveMatchChat({ playerId, roomTitle, isOverlay = false, onClose 
         if (cancelled) {
           return;
         }
-
+        console.log(`[WebSocket] Disconnected from chat room: ${playerId}, retrying connect...`);
         setIsSocketLive(false);
         setError("");
         reconnectTimer = window.setTimeout(connect, 1500);
@@ -197,7 +238,29 @@ export function LiveMatchChat({ playerId, roomTitle, isOverlay = false, onClose 
 
         const data = (await response.json()) as { messages?: ChatMessage[] };
         if (!cancelled && Array.isArray(data.messages)) {
-          setMessages((current) => mergeMessages(current, data.messages ?? []));
+          const incoming = data.messages ?? [];
+          setMessages((current) => {
+            const currentIds = new Set(current.map((m) => m.id));
+            incoming.forEach((msg) => {
+              if (!currentIds.has(msg.id)) {
+                if (msg.kind === "reaction") {
+                  console.log(`[Polling] Received new reaction message: ${msg.body} (id: ${msg.id})`);
+                  window.dispatchEvent(
+                    new CustomEvent("live-chat-reaction", {
+                      detail: { id: msg.id, emoji: msg.body },
+                    })
+                  );
+                } else {
+                  window.dispatchEvent(
+                    new CustomEvent("live-chat-comment", {
+                      detail: { id: msg.id, author: msg.author, body: msg.body },
+                    })
+                  );
+                }
+              }
+            });
+            return mergeMessages(current, incoming);
+          });
         }
       } catch {
         if (!cancelled) {
@@ -228,6 +291,15 @@ export function LiveMatchChat({ playerId, roomTitle, isOverlay = false, onClose 
     const trimmedBody = body.trim();
     if (!trimmedBody || isSending) {
       return;
+    }
+
+    if (kind === "reaction") {
+      const now = Date.now();
+      if (now - lastReactionSentRef.current < 450) {
+        console.log(`[Reaction] Sender throttled reaction: ${trimmedBody}`);
+        return;
+      }
+      lastReactionSentRef.current = now;
     }
 
     setIsSending(true);
@@ -264,6 +336,20 @@ export function LiveMatchChat({ playerId, roomTitle, isOverlay = false, onClose 
       }
 
       setMessages((current) => mergeMessages(current, [data.message as ChatMessage]));
+      if (data.message.kind === "reaction") {
+        console.log(`[POST Fallback] Sent and received reaction message: ${data.message.body} (id: ${data.message.id})`);
+        window.dispatchEvent(
+          new CustomEvent("live-chat-reaction", {
+            detail: { id: data.message.id, emoji: data.message.body },
+          })
+        );
+      } else {
+        window.dispatchEvent(
+          new CustomEvent("live-chat-comment", {
+            detail: { id: data.message.id, author: data.message.author, body: data.message.body },
+          })
+        );
+      }
       setMessageText("");
     } catch {
       setError("Message not sent. Try again.");
@@ -475,6 +561,32 @@ export function LiveMatchChat({ playerId, roomTitle, isOverlay = false, onClose 
         </form>
 
         {error ? <p className="mt-2 text-xs font-semibold text-amber-200">{error}</p> : null}
+
+        {/* Toggle switch row under the chat input */}
+        <div className="mt-2.5 flex items-center justify-between border-t border-white/5 pt-2.5 px-1 text-[10px] select-none">
+          <span className="font-bold text-slate-500 uppercase tracking-wider">Screen Overlay</span>
+          <button
+            type="button"
+            onClick={toggleFloating}
+            className="flex items-center gap-1.5 cursor-pointer group"
+            title={isFloatingEnabled ? "Disable floating overlay" : "Enable floating overlay"}
+          >
+            <span className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400 group-hover:text-slate-200 transition-colors">
+              Float
+            </span>
+            <div
+              className={`w-7 h-4 rounded-full relative transition-colors duration-300 ${
+                isFloatingEnabled ? "bg-emerald-400" : "bg-white/10"
+              }`}
+            >
+              <div
+                className={`w-2.8 h-2.8 rounded-full bg-white absolute top-0.6 transition-all duration-300 ${
+                  isFloatingEnabled ? "left-[14px]" : "left-[2px]"
+                }`}
+              />
+            </div>
+          </button>
+        </div>
       </div>
     </aside>
   );

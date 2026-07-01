@@ -134,8 +134,10 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
               />
             </div>
 
-            {isChatOpen && !isMobile && (
-              <LiveMatchChat playerId={playerId} roomTitle={player.name} />
+            {!isMobile && (
+              <div className={isChatOpen ? "block" : "hidden"}>
+                <LiveMatchChat playerId={playerId} roomTitle={player.name} />
+              </div>
             )}
           </div>
         ) : (

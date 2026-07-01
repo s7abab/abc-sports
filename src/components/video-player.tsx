@@ -3,8 +3,10 @@
 import { MediaPlayer, MediaProvider, Poster, isHLSProvider, useMediaPlayer, useMediaStore, type MediaPlayerInstance, type MediaProviderAdapter } from "@vidstack/react";
 import { defaultLayoutIcons, DefaultVideoLayout } from "@vidstack/react/player/layouts/default";
 import { forwardRef, useState, useRef, useImperativeHandle, useEffect } from "react";
-import { MessageSquare, MessageSquareOff, Server, Loader2, Crop } from "lucide-react";
+import { MessageSquare, MessageSquareOff, Server, Loader2, Crop, ToggleLeft, ToggleRight } from "lucide-react";
 import { LiveMatchChat } from "@/components/live-match-chat";
+import { FloatingReactions } from "@/components/floating-reactions";
+import { FloatingChat } from "@/components/floating-chat";
 
 interface VideoPlayerProps {
   src: string;
@@ -60,6 +62,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
   ({ src, title, poster, thumbnails, onPlay, onPause, children, muted = false, autoPlay = false, isChatOpen = false, onToggleChat, playerId, isMobile = false, servers = [], activeServerId, onServerChange }, ref) => {
     const [objectFit, setObjectFit] = useState<"contain" | "cover" | "fill">("contain");
     const [isServerMenuOpen, setIsServerMenuOpen] = useState(false);
+    const [isFloatingEnabled, setIsFloatingEnabled] = useState(false); // Disabled initially
     const playerRef = useRef<MediaPlayerInstance>(null);
 
     useEffect(() => {
@@ -261,6 +264,18 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                       )}
                     </button>
                   )}
+                  <button
+                    onClick={() => setIsFloatingEnabled((prev) => !prev)}
+                    className="vds-button h-full aspect-square flex items-center justify-center transition-colors duration-150 mr-1.5 cursor-pointer"
+                    title={isFloatingEnabled ? "Disable Screen Overlay (Reactions/Chat)" : "Enable Screen Overlay (Reactions/Chat)"}
+                    aria-label="Toggle floating overlay"
+                  >
+                    {isFloatingEnabled ? (
+                      <ToggleRight className="w-5 h-5 text-emerald-400" />
+                    ) : (
+                      <ToggleLeft className="w-5 h-5 text-slate-400 hover:text-white" />
+                    )}
+                  </button>
                   <PIPToggle />
                    <button
                     onClick={toggleFit}
@@ -288,9 +303,13 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
           />
 
           {/* Chat Overlay inside the video player (rendered when chat is open and either on mobile or fullscreen) */}
-          {showOverlayChat && playerId && (
+          {playerId && (isMobile || fullscreen || showOverlayChat) && (
             <div
-              className="absolute inset-y-0 right-0 w-full sm:w-80 md:w-96 z-40 flex flex-col pointer-events-auto"
+              className={`absolute inset-y-0 right-0 w-full sm:w-80 md:w-96 z-40 flex flex-col pointer-events-auto transition-all duration-300 ${
+                showOverlayChat
+                  ? "translate-x-0 opacity-100"
+                  : "translate-x-full opacity-0 pointer-events-none"
+              }`}
               onClick={(e) => e.stopPropagation()}
             >
               <LiveMatchChat
@@ -300,6 +319,13 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                 onClose={onToggleChat}
               />
             </div>
+          )}
+
+          {isFloatingEnabled && (
+            <>
+              <FloatingReactions isChatOverlayOpen={showOverlayChat} />
+              <FloatingChat isChatOverlayOpen={showOverlayChat} />
+            </>
           )}
 
           {/* Slow connection overlay warning */}
