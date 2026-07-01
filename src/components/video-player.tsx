@@ -16,10 +16,10 @@ interface VideoPlayerProps {
 
 export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
   ({ src, title, poster, thumbnails, onPlay, onPause, children }, ref) => {
-    const [objectFit, setObjectFit] = useState<"contain" | "cover">("contain");
+    const [objectFit, setObjectFit] = useState<"contain" | "fill">("contain");
 
     const toggleFit = () => {
-      setObjectFit((prev) => (prev === "contain" ? "cover" : "contain"));
+      setObjectFit((prev) => (prev === "contain" ? "fill" : "contain"));
     };
 
     const handleProviderChange = (provider: MediaProviderAdapter | null) => {
@@ -62,7 +62,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                 <button
                   onClick={toggleFit}
                   className="vds-button h-full aspect-square flex items-center justify-center text-slate-300 hover:text-white transition-colors duration-150 mr-1.5"
-                  title={objectFit === "contain" ? "Fill Screen (Cover)" : "Fit Screen (Contain)"}
+                  title={objectFit === "contain" ? "Fill Screen (Stretch)" : "Fit Screen (Contain)"}
                   aria-label="Toggle Fit/Fill scaling"
                 >
                   {objectFit === "contain" ? (
@@ -73,7 +73,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                     </svg>
                   ) : (
                     <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      {/* Fill Icon: full cover scaling indicator */}
+                      {/* Fill Icon: full stretched indicator */}
                       <rect x="2" y="5" width="20" height="14" rx="2" fill="currentColor" stroke="currentColor" />
                       <path d="M6 12h12M12 6v12" stroke="black" strokeWidth={2.5} strokeLinecap="round" />
                     </svg>
