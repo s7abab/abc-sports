@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { readMatches } from "@/lib/match-storage";
 import {
   deriveRuntimeMatchStatus,
@@ -65,6 +67,14 @@ function statusMeta(status: RuntimeMatchStatus) {
   };
 }
 
+function matchHref(match: { id: string; playerId: string; runtimeStatus: RuntimeMatchStatus }) {
+  if (match.runtimeStatus === "live") {
+    return `/player/${match.playerId}`;
+  }
+
+  return `/match/${match.id}`;
+}
+
 export default async function Home() {
   const matches = await readMatches();
   const now = new Date();
@@ -100,7 +110,10 @@ export default async function Home() {
         ) : (
           <>
             {nextMatch ? (
-              <section className="mt-8 overflow-hidden rounded-[2rem] border border-emerald-200/20 bg-emerald-100/[0.08] p-5 shadow-[0_30px_100px_rgba(0,0,0,0.38)] sm:p-8">
+              <Link
+                href={matchHref(nextMatch)}
+                className="mt-8 block overflow-hidden rounded-[2rem] border border-emerald-200/20 bg-emerald-100/[0.08] p-5 shadow-[0_30px_100px_rgba(0,0,0,0.38)] transition hover:border-emerald-200/35 hover:bg-emerald-100/[0.11] sm:p-8"
+              >
                 <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.32em] text-emerald-200/80">
@@ -138,14 +151,15 @@ export default async function Home() {
                     })()}
                   </div>
                 </div>
-              </section>
+              </Link>
             ) : null}
 
             <section className="mt-6 grid gap-4 sm:grid-cols-2">
               {upcomingMatches.map((match) => (
-                <article
+                <Link
                   key={match.id}
-                  className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 shadow-[0_18px_70px_rgba(0,0,0,0.25)]"
+                  href={matchHref(match)}
+                  className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 shadow-[0_18px_70px_rgba(0,0,0,0.25)] transition hover:border-white/20 hover:bg-white/[0.09]"
                 >
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex min-w-0 items-center gap-3">
@@ -185,7 +199,7 @@ export default async function Home() {
                       );
                     })()}
                   </div>
-                </article>
+                </Link>
               ))}
             </section>
           </>

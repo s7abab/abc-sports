@@ -247,6 +247,10 @@ export function readMatches(): MatchConfig[] {
   }));
 }
 
+export function readMatch(id: string): MatchConfig | null {
+  return readMatches().find((match) => match.id === id) ?? null;
+}
+
 export function saveMatches(input: unknown): MatchConfig[] {
   ensureDatabase();
 

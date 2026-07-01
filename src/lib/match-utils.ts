@@ -85,6 +85,24 @@ export function getMatchSortValue(dateString: string): number {
   return parseMatchDateTime(dateString)?.getTime() ?? Number.MAX_SAFE_INTEGER;
 }
 
+export function getMatchLiveStart(dateString: string): Date | null {
+  const matchDate = parseMatchDateTime(dateString);
+  if (!matchDate) {
+    return null;
+  }
+
+  return new Date(matchDate.getTime() - MATCH_LIVE_LEAD_MS);
+}
+
+export function getMatchLiveEnd(dateString: string): Date | null {
+  const matchDate = parseMatchDateTime(dateString);
+  if (!matchDate) {
+    return null;
+  }
+
+  return new Date(matchDate.getTime() + MATCH_LIVE_WINDOW_MS);
+}
+
 export function deriveMatchStatus(dateString: string): MatchStatus {
   const today = getLocalDateKey();
   const matchDate = normalizeDate(dateString);
@@ -106,6 +124,9 @@ export function deriveMatchStatus(dateString: string): MatchStatus {
 
 export function deriveRuntimeMatchStatus(dateString: string, now = new Date()): RuntimeMatchStatus {
   const matchDate = parseMatchDateTime(dateString);
+  const liveStart = getMatchLiveStart(dateString);
+  const liveEnd = getMatchLiveEnd(dateString);
+
   if (!matchDate) {
     return deriveMatchStatus(dateString);
   }
@@ -121,12 +142,11 @@ export function deriveRuntimeMatchStatus(dateString: string, now = new Date()): 
     return "upcoming";
   }
 
-  const elapsedMs = now.getTime() - matchDate.getTime();
-  if (elapsedMs < -MATCH_LIVE_LEAD_MS) {
+  if (liveStart && now.getTime() < liveStart.getTime()) {
     return "today";
   }
 
-  if (elapsedMs <= MATCH_LIVE_WINDOW_MS) {
+  if (liveEnd && now.getTime() <= liveEnd.getTime()) {
     return "live";
   }
 
