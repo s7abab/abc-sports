@@ -3,7 +3,7 @@
 import React, { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Save, Link2, CheckCircle2, AlertCircle, Loader2, Lock, ShieldAlert } from "lucide-react";
+import { ArrowLeft, Save, Link2, CheckCircle2, AlertCircle, Loader2, Lock, ShieldAlert, Copy, Check } from "lucide-react";
 
 interface PlayerConfig {
   id: string;
@@ -119,6 +119,21 @@ function ConfigureForm() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopyLink = (id: string) => {
+    if (typeof window === "undefined") return;
+    const link = `${window.location.origin}/player/${id}`;
+    navigator.clipboard.writeText(link)
+      .then(() => {
+        setCopiedId(id);
+        setTimeout(() => setCopiedId(null), 2000);
+      })
+      .catch((err) => {
+        console.error("Failed to copy link:", err);
+      });
   };
 
   // Determine if a specific filter is applied, and check if that player exists
@@ -261,11 +276,33 @@ function ConfigureForm() {
                           {player.name}
                         </label>
                       </div>
-                      {isFiltering && (
-                        <span className="text-[10px] text-slate-500">
-                          Currently configuring
-                        </span>
-                      )}
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleCopyLink(player.id)}
+                          className="flex items-center gap-1 text-[9px] font-medium text-slate-400 hover:text-white bg-white/[0.03] border border-white/5 hover:bg-white/[0.08] px-2 py-0.5 rounded-md transition-all active:scale-95 duration-150 cursor-pointer"
+                          title="Copy watch link"
+                        >
+                          {copiedId === player.id ? (
+                            <>
+                              <Check className="h-2.5 w-2.5 text-emerald-400" />
+                              <span className="text-emerald-400">Copied!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-2.5 w-2.5" />
+                              <span>Copy Link</span>
+                            </>
+                          )}
+                        </button>
+
+                        {isFiltering && (
+                          <span className="text-[10px] text-slate-500">
+                            Configuring
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div className="relative flex items-center">
