@@ -8,10 +8,15 @@ import {
   type RuntimeMatchStatus,
 } from "@/lib/match-utils";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
-function TeamLogo({ name, logoUrl }: { name: string; logoUrl: string }) {
+function TeamLogo({
+  name,
+  logoUrl,
+  size = "sm",
+}: {
+  name: string;
+  logoUrl: string;
+  size?: "sm" | "md" | "lg";
+}) {
   const initials = name
     .split(/\s+/)
     .filter(Boolean)
@@ -19,12 +24,26 @@ function TeamLogo({ name, logoUrl }: { name: string; logoUrl: string }) {
     .map((part) => part[0]?.toUpperCase())
     .join("");
 
+  let dimensions = "h-8 w-8";
+  let padding = "p-1";
+  let font = "text-[10px]";
+
+  if (size === "md") {
+    dimensions = "h-11 w-11";
+    padding = "p-1";
+    font = "text-xs";
+  } else if (size === "lg") {
+    dimensions = "h-20 w-20";
+    padding = "p-2.5";
+    font = "text-xl";
+  }
+
   if (logoUrl) {
     return (
       <img
         src={logoUrl}
         alt={`${name} logo`}
-        className="h-14 w-14 rounded-full border border-white/15 bg-white object-contain p-2 shadow-[0_12px_40px_rgba(0,0,0,0.25)]"
+        className={`${dimensions} rounded-full border border-white/10 bg-white object-contain ${padding} shadow-sm transition-transform duration-300 group-hover:scale-105`}
       />
     );
   }
@@ -32,7 +51,7 @@ function TeamLogo({ name, logoUrl }: { name: string; logoUrl: string }) {
   return (
     <div
       aria-label={`${name} logo`}
-      className="grid h-14 w-14 place-items-center rounded-full border border-white/15 bg-white/10 text-sm font-bold text-white shadow-[0_12px_40px_rgba(0,0,0,0.25)]"
+      className={`grid ${dimensions} place-items-center rounded-full border border-white/10 bg-zinc-900/60 ${font} font-bold text-zinc-400 transition-transform duration-300 group-hover:scale-105`}
     >
       {initials || name[0]?.toUpperCase()}
     </div>
@@ -43,27 +62,20 @@ function statusMeta(status: RuntimeMatchStatus) {
   if (status === "live") {
     return {
       label: "Live",
-      className: "border-red-400/40 bg-red-500 text-white shadow-[0_0_28px_rgba(239,68,68,0.35)]",
+      className: "border-red-500/20 bg-red-500/10 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.1)]",
     };
   }
 
   if (status === "completed") {
     return {
       label: "Completed",
-      className: "border-emerald-400/20 bg-emerald-400/10 text-emerald-200",
-    };
-  }
-
-  if (status === "today") {
-    return {
-      label: "Today",
-      className: "border-white/10 bg-transparent text-white/55",
+      className: "border-zinc-850 bg-zinc-900/40 text-zinc-500",
     };
   }
 
   return {
-    label: "Upcoming",
-    className: "border-white/10 bg-transparent text-white/55",
+    label: "Scheduled",
+    className: "border-zinc-800 bg-zinc-900/10 text-zinc-400",
   };
 }
 
@@ -85,124 +97,105 @@ export default async function Home() {
     }))
     .filter((match) => match.runtimeStatus !== "completed")
     .sort((first, second) => getMatchSortValue(first.date) - getMatchSortValue(second.date));
-  const nextMatch = upcomingMatches[0];
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(24,182,153,0.26),transparent_32rem),linear-gradient(135deg,#07110f_0%,#101510_48%,#050608_100%)] px-4 py-8 text-white sm:px-6 lg:px-8">
-      <div className="mx-auto w-full max-w-5xl">
-        <header className="flex flex-col gap-3 border-b border-white/10 pb-6 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <span className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-300 text-lg font-black tracking-[-0.08em] text-emerald-950 shadow-[0_12px_35px_rgba(110,231,183,0.28)]">
+    <main className="relative min-h-screen bg-zinc-950 px-4 pt-6 sm:pt-8 pb-12 text-zinc-100 sm:px-6 lg:px-8 font-sans overflow-x-hidden selection:bg-emerald-500/20 selection:text-white">
+      {/* Background soft glowing accent */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(16,185,129,0.07),transparent_50rem)] pointer-events-none" />
+
+      <div className="relative mx-auto w-full max-w-4xl">
+        <header className="mb-6 flex items-center justify-between border-b border-white/[0.06] pb-6">
+          <div className="flex items-center gap-3.5">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center font-black text-black text-sm tracking-tighter shadow-[0_4px_20px_rgba(52,211,153,0.25)]">
               ABC
-            </span>
+            </div>
             <div>
-              <h1 className="text-3xl font-black uppercase leading-none tracking-[-0.05em] text-white sm:text-5xl">
-                ABC Sports
+              <h1 className="text-xl font-bold tracking-tight text-white bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
+                ABC SPORTS
               </h1>
+              <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-semibold mt-0.5">
+                Match Schedule & Streams
+              </p>
             </div>
           </div>
         </header>
 
         {upcomingMatches.length === 0 ? (
-          <p className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-white/70">
-            No upcoming matches are available yet.
-          </p>
+          <div className="mt-8 rounded-2xl border border-white/[0.06] bg-white/[0.01] p-12 text-center backdrop-blur-md">
+            <p className="text-sm text-zinc-500">
+              No upcoming matches scheduled. Check back later!
+            </p>
+          </div>
         ) : (
-          <>
-            {nextMatch ? (
-              <Link
-                href={matchHref(nextMatch)}
-                className="mt-8 block overflow-hidden rounded-[2rem] border border-emerald-200/20 bg-emerald-100/[0.08] p-5 shadow-[0_30px_100px_rgba(0,0,0,0.38)] transition hover:border-emerald-200/35 hover:bg-emerald-100/[0.11] sm:p-8"
-              >
-                <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.32em] text-emerald-200/80">
-                      Next Match
-                    </p>
-                    <p className="mt-3 text-sm font-medium text-white/65">{nextMatch.competition}</p>
-                  </div>
-
-                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 sm:gap-8">
-                    <div className="flex flex-col items-center text-center">
-                      <TeamLogo name={nextMatch.home} logoUrl={nextMatch.homeLogoUrl} />
-                      <p className="mt-3 text-base font-bold sm:text-xl">{nextMatch.home}</p>
-                    </div>
-                    <span className="rounded-full border border-white/15 bg-black/30 px-4 py-2 text-xs font-black uppercase tracking-[0.24em] text-white/70">
-                      vs
-                    </span>
-                    <div className="flex flex-col items-center text-center">
-                      <TeamLogo name={nextMatch.away} logoUrl={nextMatch.awayLogoUrl} />
-                      <p className="mt-3 text-base font-bold sm:text-xl">{nextMatch.away}</p>
-                    </div>
-                  </div>
-
-                  <div className="lg:text-right">
-                    {(() => {
-                      const meta = statusMeta(nextMatch.runtimeStatus);
-
-                      return (
-                        <>
-                    <p className="text-sm font-semibold text-white">{formatMatchDate(nextMatch.date)}</p>
-                    <p className={`mt-2 inline-flex rounded-full border px-3 py-1 text-xs font-black uppercase tracking-[0.2em] ${meta.className}`}>
-                      {meta.label}
-                    </p>
-                        </>
-                      );
-                    })()}
-                  </div>
-                </div>
-              </Link>
-            ) : null}
-
-            <section className="mt-6 grid gap-4 sm:grid-cols-2">
-              {upcomingMatches.map((match) => (
+          <div className="grid gap-6 sm:grid-cols-2">
+            {upcomingMatches.map((match, index) => {
+              const isNext = index === 0;
+              const meta = statusMeta(match.runtimeStatus);
+              return (
                 <Link
                   key={match.id}
                   href={matchHref(match)}
-                  className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 shadow-[0_18px_70px_rgba(0,0,0,0.25)] transition hover:border-white/20 hover:bg-white/[0.09]"
+                  className="relative overflow-hidden rounded-2xl border border-white/[0.05] bg-white/[0.01] backdrop-blur-md p-4 transition-all duration-300 hover:bg-white/[0.03] hover:border-white/10 hover:shadow-[0_8px_25px_rgba(0,0,0,0.5)] group flex flex-col justify-between"
                 >
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <TeamLogo name={match.home} logoUrl={match.homeLogoUrl} />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-bold text-white">{match.home}</p>
-                        <p className="mt-1 text-xs font-semibold uppercase tracking-[0.22em] text-white/40">
-                          Home
-                        </p>
-                      </div>
-                    </div>
-                    <span className="shrink-0 text-xs font-black uppercase tracking-[0.22em] text-white/45">
-                      vs
+                  {/* Top Row: Competition Name & Badges */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                      {match.competition}
                     </span>
-                    <div className="flex min-w-0 items-center gap-3 text-right">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-bold text-white">{match.away}</p>
-                        <p className="mt-1 text-xs font-semibold uppercase tracking-[0.22em] text-white/40">
-                          Away
-                        </p>
-                      </div>
-                      <TeamLogo name={match.away} logoUrl={match.awayLogoUrl} />
+                    <div className="flex items-center gap-2">
+                      {isNext && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 px-2 py-0.5 text-[9px] font-semibold text-emerald-400">
+                          NEXT
+                        </span>
+                      )}
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-medium border ${meta.className}`}
+                      >
+                        {match.runtimeStatus === "live" && (
+                          <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
+                        )}
+                        {meta.label}
+                      </span>
                     </div>
                   </div>
 
-                  <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
-                    {(() => {
-                      const meta = statusMeta(match.runtimeStatus);
+                  {/* Middle Matchup Row with Big Logos */}
+                  <div className="my-4 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+                    {/* Home Team */}
+                    <div className="flex flex-col items-center text-center gap-1.5 min-w-0">
+                      <TeamLogo name={match.home} logoUrl={match.homeLogoUrl} size="md" />
+                      <span className="text-xs font-semibold text-zinc-200 group-hover:text-white transition-colors truncate w-full">
+                        {match.home}
+                      </span>
+                    </div>
 
-                      return (
-                        <>
-                    <p className="text-sm font-semibold text-white/80">{formatMatchDate(match.date)}</p>
-                    <p className={`rounded-full border px-3 py-1 text-xs font-black uppercase tracking-[0.18em] ${meta.className}`}>
-                      {meta.label}
-                    </p>
-                        </>
-                      );
-                    })()}
+                    {/* VS Center Divider */}
+                    <div className="flex flex-col items-center gap-1 shrink-0 px-2">
+                      <span className="text-[10px] font-bold text-zinc-500 bg-zinc-900/60 px-1.5 py-0.5 rounded border border-white/[0.05] shadow-inner select-none">
+                        VS
+                      </span>
+                    </div>
+
+                    {/* Away Team */}
+                    <div className="flex flex-col items-center text-center gap-1.5 min-w-0">
+                      <TeamLogo name={match.away} logoUrl={match.awayLogoUrl} size="md" />
+                      <span className="text-xs font-semibold text-zinc-200 group-hover:text-white transition-colors truncate w-full">
+                        {match.away}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Bottom Row: Date & Action Link */}
+                  <div className="border-t border-white/[0.04] pt-3 flex items-center justify-between text-xs">
+                    <span className="text-zinc-400 font-medium text-[11px]">{formatMatchDate(match.date)}</span>
+                    <span className="text-[10px] text-emerald-400 font-semibold uppercase tracking-wider flex items-center gap-1 group-hover:translate-x-0.5 transition-transform duration-300">
+                      {match.runtimeStatus === "live" ? "Watch Live →" : "Details →"}
+                    </span>
                   </div>
                 </Link>
-              ))}
-            </section>
-          </>
+              );
+            })}
+          </div>
         )}
       </div>
     </main>

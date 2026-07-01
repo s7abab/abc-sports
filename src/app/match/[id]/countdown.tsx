@@ -43,19 +43,21 @@ export function MatchCountdown({
     return () => window.clearInterval(interval);
   }, [liveStartTime, playerHref, router]);
 
+  const items = formatRemaining(remainingMs);
+
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      {formatRemaining(remainingMs).map((item) => (
+    <div className="grid grid-cols-4 gap-3 sm:gap-4 max-w-sm mx-auto">
+      {items.map((item) => (
         <div
           key={item.label}
-          className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 text-center"
+          className="flex flex-col items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.02] py-3.5 px-2 backdrop-blur-md shadow-sm transition-all duration-300 hover:border-white/10 hover:bg-white/[0.04]"
         >
-          <p className="text-3xl font-black tabular-nums text-white">
+          <span className="text-xl sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-b from-white to-zinc-400 tracking-tight tabular-nums">
             {String(item.value).padStart(2, "0")}
-          </p>
-          <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.24em] text-white/45">
+          </span>
+          <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-wider mt-1.5">
             {item.label}
-          </p>
+          </span>
         </div>
       ))}
     </div>

@@ -37,7 +37,7 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
   const [activeServerId, setActiveServerId] = useState<"1" | "2" | "3" | "4" | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-  const [isChatOpen, setIsChatOpen] = useState(true);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const isMobile = useIsMobile();
 
   const toggleChat = () => setIsChatOpen((prev) => !prev);

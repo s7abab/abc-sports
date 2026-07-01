@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { deleteMatch, updateMatch } from "@/lib/match-storage";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+
 
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
