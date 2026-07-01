@@ -91,9 +91,41 @@ const DEFAULT_MATCHES: MatchConfig[] = [
 ];
 
 let databaseInitialized = false;
+let sqliteAvailable: boolean | null = null;
+
+const memoryStore = globalThis as typeof globalThis & {
+  __abcSportsMatches?: MatchConfig[];
+};
+
+function canUseSqlite() {
+  if (sqliteAvailable !== null) {
+    return sqliteAvailable;
+  }
+
+  try {
+    execFileSync("sqlite3", ["-version"], { stdio: "ignore" });
+    sqliteAvailable = true;
+  } catch {
+    sqliteAvailable = false;
+  }
+
+  return sqliteAvailable;
+}
+
+function ensureMemoryStore() {
+  if (!memoryStore.__abcSportsMatches) {
+    memoryStore.__abcSportsMatches = DEFAULT_MATCHES.map((match) => ({ ...match }));
+  }
+}
 
 function ensureDatabase() {
   if (databaseInitialized) {
+    return;
+  }
+
+  if (!canUseSqlite()) {
+    ensureMemoryStore();
+    databaseInitialized = true;
     return;
   }
 
@@ -191,6 +223,11 @@ function normalizeMatch(value: unknown): MatchConfig | null {
 }
 
 function replaceMatches(matches: MatchConfig[]) {
+  if (!canUseSqlite()) {
+    memoryStore.__abcSportsMatches = matches.map((match) => ({ ...match }));
+    return;
+  }
+
   const statements = [
     "BEGIN TRANSACTION;",
     "DELETE FROM matches;",
@@ -229,6 +266,15 @@ function replaceMatches(matches: MatchConfig[]) {
 
 export function readMatches(): MatchConfig[] {
   ensureDatabase();
+
+  if (!canUseSqlite()) {
+    ensureMemoryStore();
+    return (memoryStore.__abcSportsMatches ?? []).map((match) => ({
+      ...match,
+      status: deriveMatchStatus(match.date),
+    }));
+  }
+
   const rows = querySqlite<MatchRow>(
     "SELECT id, position, live, status, competition, date, home, away, playerId, homeLogoUrl, awayLogoUrl FROM matches ORDER BY position ASC;"
   );

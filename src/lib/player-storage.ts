@@ -20,7 +20,6 @@ export interface PlayerConfig {
 }
 
 type ServerSlot = "1" | "2" | "3" | "4";
-type ServerMap = Record<ServerSlot, PlayerServer>;
 
 interface PlayerRow {
   id: string;
@@ -35,9 +34,53 @@ const DB_PATH = path.join(DATA_DIR, "players.sqlite");
 const SEED_PATH = path.join(DATA_DIR, "players.json");
 
 let databaseInitialized = false;
+let sqliteAvailable: boolean | null = null;
+
+const memoryStore = globalThis as typeof globalThis & {
+  __abcSportsPlayers?: PlayerConfig[];
+};
+
+function canUseSqlite() {
+  if (sqliteAvailable !== null) {
+    return sqliteAvailable;
+  }
+
+  try {
+    execFileSync("sqlite3", ["-version"], { stdio: "ignore" });
+    sqliteAvailable = true;
+  } catch {
+    sqliteAvailable = false;
+  }
+
+  return sqliteAvailable;
+}
+
+function clonePlayers(players: PlayerConfig[]) {
+  return players.map((player) => ({
+    ...player,
+    servers: {
+      "1": { ...player.servers["1"] },
+      "2": { ...player.servers["2"] },
+      "3": { ...player.servers["3"] },
+      "4": { ...player.servers["4"] },
+    },
+  }));
+}
+
+function ensureMemoryStore() {
+  if (!memoryStore.__abcSportsPlayers) {
+    memoryStore.__abcSportsPlayers = clonePlayers(loadSeedPlayers());
+  }
+}
 
 function ensureDatabase() {
   if (databaseInitialized) {
+    return;
+  }
+
+  if (!canUseSqlite()) {
+    ensureMemoryStore();
+    databaseInitialized = true;
     return;
   }
 
@@ -144,6 +187,11 @@ function normalizePlayer(value: unknown, position = 0): PlayerConfig | null {
 }
 
 function replacePlayers(players: PlayerConfig[]) {
+  if (!canUseSqlite()) {
+    memoryStore.__abcSportsPlayers = clonePlayers(players);
+    return;
+  }
+
   const statements = [
     "BEGIN TRANSACTION;",
     "DELETE FROM players;",
@@ -176,6 +224,12 @@ function replacePlayers(players: PlayerConfig[]) {
 
 export function readPlayers(): PlayerConfig[] {
   ensureDatabase();
+
+  if (!canUseSqlite()) {
+    ensureMemoryStore();
+    return clonePlayers(memoryStore.__abcSportsPlayers ?? []);
+  }
+
   const rows = querySqlite<PlayerRow>(
     "SELECT id, position, name, primaryServer, servers FROM players ORDER BY position ASC;"
   );

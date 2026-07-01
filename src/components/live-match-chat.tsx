@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
-import { MessageCircle, Send, Smile, UserRound } from "lucide-react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { AtSign, MessageCircle, Send, Smile, UserRound } from "lucide-react";
 
 import type { ChatMessage } from "@/lib/chat-storage";
 
@@ -11,6 +11,7 @@ interface LiveMatchChatProps {
 }
 
 const QUICK_REACTIONS = ["🔥", "👏", "⚽", "😱", "❤️"];
+const MAX_NAME_LENGTH = 28;
 
 function createGuestName() {
   return `Fan ${Math.floor(1000 + Math.random() * 9000)}`;
@@ -28,6 +29,10 @@ function formatMessageTime(value: string) {
   });
 }
 
+function normalizeDisplayName(value: string) {
+  return value.replace(/\s+/g, " ").trim().slice(0, MAX_NAME_LENGTH);
+}
+
 function mergeMessages(current: ChatMessage[], incoming: ChatMessage[]) {
   const byId = new Map<string, ChatMessage>();
   [...current, ...incoming].forEach((message) => {
@@ -39,16 +44,61 @@ function mergeMessages(current: ChatMessage[], incoming: ChatMessage[]) {
   );
 }
 
+function getActiveMentionQuery(value: string) {
+  const match = value.match(/(^|\s)@([A-Za-z0-9_ -]{0,28})$/);
+  return match ? match[2].toLowerCase() : null;
+}
+
+function renderMessageBody(body: string) {
+  const parts = body.split(/(@[A-Za-z0-9_ -]{1,28})/g);
+
+  return parts.map((part, index) => {
+    if (part.startsWith("@") && part.length > 1) {
+      return (
+        <span key={`${part}-${index}`} className="font-black text-emerald-200">
+          {part}
+        </span>
+      );
+    }
+
+    return part;
+  });
+}
+
 export function LiveMatchChat({ playerId, roomTitle }: LiveMatchChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [messageText, setMessageText] = useState("");
   const [viewerName, setViewerName] = useState("Fan");
+  const [nameInput, setNameInput] = useState("Fan");
   const [isSending, setIsSending] = useState(false);
   const [isSocketLive, setIsSocketLive] = useState(false);
   const [error, setError] = useState("");
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const latestMessageTimeRef = useRef("");
+
+  const knownUsers = useMemo(() => {
+    const users = new Set<string>();
+    messages.forEach((message) => {
+      const author = normalizeDisplayName(message.author);
+      if (author && author.toLowerCase() !== viewerName.toLowerCase()) {
+        users.add(author);
+      }
+    });
+
+    return [...users].sort((first, second) => first.localeCompare(second)).slice(0, 20);
+  }, [messages, viewerName]);
+
+  const mentionQuery = getActiveMentionQuery(messageText);
+  const mentionSuggestions = useMemo(() => {
+    if (mentionQuery === null) {
+      return [];
+    }
+
+    return knownUsers
+      .filter((user) => user.toLowerCase().includes(mentionQuery))
+      .slice(0, 5);
+  }, [knownUsers, mentionQuery]);
 
   useEffect(() => {
     const storedName = window.localStorage.getItem("abc-sports-chat-name");
@@ -57,6 +107,7 @@ export function LiveMatchChat({ playerId, roomTitle }: LiveMatchChatProps) {
 
     const timer = window.setTimeout(() => {
       setViewerName(nextName);
+      setNameInput(nextName);
     }, 0);
 
     return () => window.clearTimeout(timer);
@@ -241,6 +292,31 @@ export function LiveMatchChat({ playerId, roomTitle }: LiveMatchChatProps) {
     sendMessage(messageText);
   }
 
+  function handleNameChange(value: string) {
+    const nextName = value.slice(0, MAX_NAME_LENGTH);
+    setNameInput(nextName);
+
+    const normalizedName = normalizeDisplayName(nextName);
+    if (normalizedName) {
+      setViewerName(normalizedName);
+      window.localStorage.setItem("abc-sports-chat-name", normalizedName);
+    }
+  }
+
+  function insertMention(user: string) {
+    setMessageText((current) => {
+      const nextMention = `@${user} `;
+
+      if (getActiveMentionQuery(current) === null) {
+        return `${current}${current && !current.endsWith(" ") ? " " : ""}${nextMention}`;
+      }
+
+      return current.replace(/(^|\s)@[A-Za-z0-9_ -]{0,28}$/, (match, prefix: string) => {
+        return `${prefix}${nextMention}`;
+      });
+    });
+  }
+
   return (
     <aside className="flex h-[28rem] min-h-0 w-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0f1115]/95 shadow-2xl sm:h-[32rem] lg:sticky lg:top-6 lg:h-[min(72vh,38rem)] lg:min-h-[30rem]">
       <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
@@ -307,7 +383,7 @@ export function LiveMatchChat({ playerId, roomTitle }: LiveMatchChatProps) {
                   message.kind === "reaction" ? "text-2xl leading-8" : "text-sm leading-5 text-slate-100"
                 }`}
               >
-                {message.body}
+                {renderMessageBody(message.body)}
               </p>
             </div>
           ))
@@ -330,16 +406,47 @@ export function LiveMatchChat({ playerId, roomTitle }: LiveMatchChatProps) {
           ))}
         </div>
 
+        <div className="mb-3 flex items-center gap-2 rounded-xl border border-white/10 bg-black/25 px-3 py-2">
+          <UserRound className="h-4 w-4 shrink-0 text-slate-400" />
+          <input
+            value={nameInput}
+            onChange={(event) => handleNameChange(event.target.value)}
+            onBlur={() => {
+              if (!normalizeDisplayName(nameInput)) {
+                handleNameChange(viewerName);
+              }
+            }}
+            maxLength={MAX_NAME_LENGTH}
+            placeholder="Your name"
+            className="min-w-0 flex-1 bg-transparent text-xs font-black text-white outline-none placeholder:text-slate-500"
+            aria-label="Your chat name"
+          />
+        </div>
+
+        {mentionSuggestions.length > 0 ? (
+          <div className="mb-3 flex items-center gap-2 overflow-x-auto">
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-white/10 bg-white/[0.06] text-slate-400">
+              <AtSign className="h-4 w-4" />
+            </span>
+            {mentionSuggestions.map((user) => (
+              <button
+                key={user}
+                type="button"
+                onClick={() => insertMention(user)}
+                className="shrink-0 rounded-full border border-emerald-200/20 bg-emerald-300/[0.08] px-3 py-1.5 text-xs font-black text-emerald-100 transition hover:border-emerald-200/45 hover:bg-emerald-300/15"
+              >
+                @{user}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
         <form onSubmit={handleSubmit} className="flex items-center gap-2">
-          <label className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.06] text-slate-300">
-            <UserRound className="h-4 w-4" />
-            <span className="sr-only">Display name</span>
-          </label>
           <input
             value={messageText}
             onChange={(event) => setMessageText(event.target.value)}
             maxLength={280}
-            placeholder={`Chat as ${viewerName}`}
+            placeholder={`Message as ${viewerName}. Use @ to tag`}
             className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm font-medium text-white outline-none transition placeholder:text-slate-500 focus:border-emerald-200/45"
           />
           <button

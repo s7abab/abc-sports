@@ -30,9 +30,39 @@ const MAX_AUTHOR_LENGTH = 28;
 const MAX_ROOM_MESSAGES = 400;
 
 let databaseInitialized = false;
+let sqliteAvailable: boolean | null = null;
+
+const memoryStore = globalThis as typeof globalThis & {
+  __abcSportsChatMessages?: ChatMessage[];
+};
+
+function canUseSqlite() {
+  if (sqliteAvailable !== null) {
+    return sqliteAvailable;
+  }
+
+  try {
+    execFileSync("sqlite3", ["-version"], { stdio: "ignore" });
+    sqliteAvailable = true;
+  } catch {
+    sqliteAvailable = false;
+  }
+
+  return sqliteAvailable;
+}
+
+function ensureMemoryStore() {
+  memoryStore.__abcSportsChatMessages ??= [];
+}
 
 function ensureDatabase() {
   if (databaseInitialized) {
+    return;
+  }
+
+  if (!canUseSqlite()) {
+    ensureMemoryStore();
+    databaseInitialized = true;
     return;
   }
 
@@ -107,6 +137,20 @@ function mapRow(row: ChatMessageRow): ChatMessage {
 }
 
 function pruneRoom(playerId: string) {
+  if (!canUseSqlite()) {
+    ensureMemoryStore();
+    const messages = memoryStore.__abcSportsChatMessages ?? [];
+    const roomMessages = messages
+      .filter((message) => message.playerId === playerId)
+      .sort((first, second) => new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime())
+      .slice(0, MAX_ROOM_MESSAGES);
+    const keepIds = new Set(roomMessages.map((message) => message.id));
+    memoryStore.__abcSportsChatMessages = messages.filter(
+      (message) => message.playerId !== playerId || keepIds.has(message.id)
+    );
+    return;
+  }
+
   runSqlite(`
     DELETE FROM chat_messages
     WHERE playerId = ${sqlString(playerId)}
@@ -125,6 +169,21 @@ export function readChatMessages(playerId: string, after?: string | null): ChatM
   const trimmedPlayerId = playerId.trim();
   if (!trimmedPlayerId) {
     return [];
+  }
+
+  if (!canUseSqlite()) {
+    ensureMemoryStore();
+    const afterTime = after ? new Date(after).getTime() : 0;
+    return (memoryStore.__abcSportsChatMessages ?? [])
+      .filter((message) => {
+        if (message.playerId !== trimmedPlayerId) {
+          return false;
+        }
+
+        return afterTime ? new Date(message.createdAt).getTime() > afterTime : true;
+      })
+      .sort((first, second) => new Date(first.createdAt).getTime() - new Date(second.createdAt).getTime())
+      .slice(0, 100);
   }
 
   const afterClause = after ? `AND createdAt > ${sqlString(after)}` : "";
@@ -165,6 +224,13 @@ export function createChatMessage(
     kind: normalizeKind(input.kind),
     createdAt: new Date().toISOString(),
   };
+
+  if (!canUseSqlite()) {
+    ensureMemoryStore();
+    memoryStore.__abcSportsChatMessages = [...(memoryStore.__abcSportsChatMessages ?? []), message];
+    pruneRoom(trimmedPlayerId);
+    return message;
+  }
 
   runSqlite(`
     INSERT INTO chat_messages (id, playerId, author, body, kind, createdAt)
