@@ -95,7 +95,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
             const nextServer = servers[nextIdx];
             setNextServerName(nextServer.name);
 
-            let localCountdown = 10;
+            let localCountdown = 4;
             setCountdown(localCountdown);
 
             intervalId = setInterval(() => {
@@ -303,7 +303,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
           )}
 
           {/* Slow connection overlay warning */}
-          {countdown !== null && countdown <= 6 && (
+          {countdown !== null && countdown <= 4 && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-30 pointer-events-none select-none animate-in fade-in duration-300">
               <div className="bg-[#0f0f13]/95 backdrop-blur border border-white/10 rounded-2xl p-5 md:p-6 text-center max-w-[340px] shadow-2xl flex flex-col items-center gap-3 pointer-events-auto">
                 <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500 animate-pulse relative mb-1">
