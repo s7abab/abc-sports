@@ -1,6 +1,6 @@
 "use client";
 
-import { MediaPlayer, MediaProvider, Poster, isHLSProvider, type MediaPlayerInstance, type MediaProviderAdapter } from "@vidstack/react";
+import { MediaPlayer, MediaProvider, Poster, isHLSProvider, useMediaPlayer, type MediaPlayerInstance, type MediaProviderAdapter } from "@vidstack/react";
 import { defaultLayoutIcons, DefaultVideoLayout } from "@vidstack/react/player/layouts/default";
 import { forwardRef, useState } from "react";
 
@@ -14,6 +14,37 @@ interface VideoPlayerProps {
   children?: React.ReactNode;
 }
 
+const PIPToggle = () => {
+  const player = useMediaPlayer();
+
+  const togglePIP = async () => {
+    if (!player) return;
+    try {
+      if (player.state.pictureInPicture) {
+        await player.exitPictureInPicture();
+      } else {
+        await player.enterPictureInPicture();
+      }
+    } catch (e) {
+      console.error("Failed to toggle PiP:", e);
+    }
+  };
+
+  return (
+    <button
+      onClick={togglePIP}
+      className="vds-button h-full aspect-square flex items-center justify-center text-slate-300 hover:text-white transition-colors duration-150 mr-1.5"
+      title="Picture-in-Picture"
+      aria-label="Toggle Picture-in-Picture"
+    >
+      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" />
+        <rect x="13" y="11" width="7" height="5" rx="1" fill="currentColor" stroke="currentColor" />
+      </svg>
+    </button>
+  );
+};
+
 export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
   ({ src, title, poster, thumbnails, onPlay, onPause, children }, ref) => {
     const [objectFit, setObjectFit] = useState<"contain" | "fill">("contain");
@@ -25,7 +56,13 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
     const handleProviderChange = (provider: MediaProviderAdapter | null) => {
       if (isHLSProvider(provider)) {
         provider.config = {
-          liveSyncDuration: 5, // Keep 5 seconds delay in live HLS stream
+          liveSyncDuration: 5, // Target sync latency of 5s
+          liveMaxLatencyDuration: 15, // Allow up to 15s latency before forcing catch-up (helps absorb network drops)
+          maxBufferLength: 30, // Store up to 30s of buffer in memory for stability on slow connections
+          maxMaxBufferLength: 60,
+          abrEwmaDefaultEstimate: 500000, // Start with a conservative initial bandwidth estimate (500 Kbps)
+          enableWorker: true, // Use a web worker for parsing to keep UI responsive
+          lowLatencyMode: false, // Prioritize stability/buffering over ultra-low delay
         };
       }
     };
@@ -58,27 +95,31 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
             thumbnails={thumbnails}
             icons={defaultLayoutIcons}
             slots={{
+              pipButton: null,
               beforeFullscreenButton: (
-                <button
-                  onClick={toggleFit}
-                  className="vds-button h-full aspect-square flex items-center justify-center text-slate-300 hover:text-white transition-colors duration-150 mr-1.5"
-                  title={objectFit === "contain" ? "Fill Screen (Stretch)" : "Fit Screen (Contain)"}
-                  aria-label="Toggle Fit/Fill scaling"
-                >
-                  {objectFit === "contain" ? (
-                    <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      {/* Fit Icon: letterboxed video indicator */}
-                      <rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" strokeDasharray="3 3" />
-                      <rect x="5" y="8" width="14" height="8" rx="1" fill="currentColor" stroke="currentColor" />
-                    </svg>
-                  ) : (
-                    <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      {/* Fill Icon: full stretched indicator */}
-                      <rect x="2" y="5" width="20" height="14" rx="2" fill="currentColor" stroke="currentColor" />
-                      <path d="M6 12h12M12 6v12" stroke="black" strokeWidth={2.5} strokeLinecap="round" />
-                    </svg>
-                  )}
-                </button>
+                <div className="flex items-center">
+                  <PIPToggle />
+                  <button
+                    onClick={toggleFit}
+                    className="vds-button h-full aspect-square flex items-center justify-center text-slate-300 hover:text-white transition-colors duration-150 mr-1.5"
+                    title={objectFit === "contain" ? "Fill Screen (Stretch)" : "Fit Screen (Contain)"}
+                    aria-label="Toggle Fit/Fill scaling"
+                  >
+                    {objectFit === "contain" ? (
+                      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        {/* Fit Icon: letterboxed video indicator */}
+                        <rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" strokeDasharray="3 3" />
+                        <rect x="5" y="8" width="14" height="8" rx="1" fill="currentColor" stroke="currentColor" />
+                      </svg>
+                    ) : (
+                      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        {/* Fill Icon: full stretched indicator */}
+                        <rect x="2" y="5" width="20" height="14" rx="2" fill="currentColor" stroke="currentColor" />
+                        <path d="M6 12h12M12 6v12" stroke="black" strokeWidth={2.5} strokeLinecap="round" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
               )
             }}
           />
