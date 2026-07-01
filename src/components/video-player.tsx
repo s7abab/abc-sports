@@ -62,47 +62,69 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
     const [isServerMenuOpen, setIsServerMenuOpen] = useState(false);
     const playerRef = useRef<MediaPlayerInstance>(null);
 
+    useEffect(() => {
+      const playerEl = playerRef.current;
+      if (playerEl) {
+        const playerElAny = playerEl as any;
+        if (typeof playerElAny.setAttribute === "function") {
+          playerElAny.setAttribute("data-fit", objectFit);
+        }
+        const rawEl = playerElAny.el;
+        if (rawEl && typeof rawEl.setAttribute === "function") {
+          rawEl.setAttribute("data-fit", objectFit);
+        }
+      }
+    }, [objectFit]);
+
     // Forward the ref to the parent component
     useImperativeHandle(ref, () => playerRef.current!);
 
     const { fullscreen, waiting } = useMediaStore(playerRef);
-    const [showSlowWarning, setShowSlowWarning] = useState(false);
     const [autoSwitchingTo, setAutoSwitchingTo] = useState<string | null>(null);
+    const [countdown, setCountdown] = useState<number | null>(null);
+    const [nextServerName, setNextServerName] = useState<string | null>(null);
 
     useEffect(() => {
-      let warningTimer: NodeJS.Timeout;
-      let switchTimer: NodeJS.Timeout;
+      let intervalId: NodeJS.Timeout;
 
       if (waiting) {
-        // If waiting lasts for more than 4 seconds, show the warning
-        warningTimer = setTimeout(() => {
-          setShowSlowWarning(true);
-        }, 4000);
-
-        // If waiting lasts for more than 10 seconds and multiple servers exist, auto-switch
         if (servers.length > 1 && activeServerId && onServerChange) {
-          switchTimer = setTimeout(() => {
-            const currentIdx = servers.findIndex((s) => s.id === activeServerId);
-            if (currentIdx !== -1) {
-              const nextIdx = (currentIdx + 1) % servers.length;
-              const nextServer = servers[nextIdx];
-              setAutoSwitchingTo(nextServer.name);
-              onServerChange(nextServer.id);
+          const currentIdx = servers.findIndex((s) => s.id === activeServerId);
+          if (currentIdx !== -1) {
+            const nextIdx = (currentIdx + 1) % servers.length;
+            const nextServer = servers[nextIdx];
+            setNextServerName(nextServer.name);
 
-              // Auto-dismiss switching HUD after 4 seconds
-              setTimeout(() => {
-                setAutoSwitchingTo(null);
-              }, 4000);
-            }
-          }, 10000);
+            let localCountdown = 10;
+            setCountdown(localCountdown);
+
+            intervalId = setInterval(() => {
+              localCountdown -= 1;
+              if (localCountdown >= 0) {
+                setCountdown(localCountdown);
+              }
+              if (localCountdown === 0) {
+                clearInterval(intervalId);
+                setAutoSwitchingTo(nextServer.name);
+                onServerChange(nextServer.id);
+                setCountdown(null);
+                setNextServerName(null);
+
+                // Auto-dismiss switching HUD after 4 seconds
+                setTimeout(() => {
+                  setAutoSwitchingTo(null);
+                }, 4000);
+              }
+            }, 1000);
+          }
         }
       } else {
-        setShowSlowWarning(false);
+        setCountdown(null);
+        setNextServerName(null);
       }
 
       return () => {
-        clearTimeout(warningTimer);
-        clearTimeout(switchTimer);
+        if (intervalId) clearInterval(intervalId);
       };
     }, [waiting, servers, activeServerId, onServerChange]);
 
@@ -281,31 +303,37 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
           )}
 
           {/* Slow connection overlay warning */}
-          {showSlowWarning && (
+          {countdown !== null && countdown <= 6 && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-30 pointer-events-none select-none animate-in fade-in duration-300">
-              <div className="bg-[#0f0f13]/95 backdrop-blur border border-white/10 rounded-2xl p-4 text-center max-w-[280px] shadow-2xl flex flex-col items-center gap-2 pointer-events-auto">
-                <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500 animate-pulse">
-                  <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <div className="bg-[#0f0f13]/95 backdrop-blur border border-white/10 rounded-2xl p-5 md:p-6 text-center max-w-[340px] shadow-2xl flex flex-col items-center gap-3 pointer-events-auto">
+                <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500 animate-pulse relative mb-1">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
                   </svg>
+                  {/* Countdown number badge inside the alert */}
+                  <span className="absolute -top-1 -right-1 bg-amber-500 text-[#0f0f13] text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border border-[#0f0f13] shadow-md">
+                    {countdown}
+                  </span>
                 </div>
-                <h4 className="text-xs font-bold text-slate-200">Slow Connection</h4>
-                <p className="text-[10px] leading-relaxed text-slate-400">
-                  The stream buffer is catch-up loading. If it doesn't resume, try selecting another server.
-                </p>
+                <div className="flex flex-col gap-1.5">
+                  <h4 className="text-sm md:text-base font-bold text-slate-200">Slow Connection</h4>
+                  <p className="text-xs md:text-sm leading-relaxed text-slate-400">
+                    Stream stalled. Switching to <span className="font-semibold text-violet-400">{nextServerName}</span> in <span className="font-bold text-amber-400">{countdown}s</span>...
+                  </p>
+                </div>
               </div>
             </div>
           )}
 
           {/* Auto switching notification */}
           {autoSwitchingTo && (
-            <div className="absolute top-4 left-4 right-4 sm:left-auto sm:w-[280px] bg-violet-950/90 backdrop-blur border border-violet-500/20 text-white rounded-xl p-3 flex items-center gap-3 shadow-2xl z-30 animate-in slide-in-from-top-4 duration-300 pointer-events-auto">
-              <div className="w-6 h-6 rounded-full bg-violet-500/20 flex items-center justify-center text-violet-400">
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            <div className="absolute top-4 left-4 right-4 sm:left-auto sm:w-[320px] bg-violet-950/90 backdrop-blur border border-violet-500/20 text-white rounded-xl p-4 flex items-center gap-3.5 shadow-2xl z-30 animate-in slide-in-from-top-4 duration-300 pointer-events-auto">
+              <div className="w-8 h-8 rounded-full bg-violet-500/20 flex items-center justify-center text-violet-400">
+                <Loader2 className="w-4.5 h-4.5 animate-spin" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-bold">Switching Server</p>
-                <p className="text-[9px] text-slate-300 truncate">
+                <p className="text-xs md:text-sm font-bold">Switching Server</p>
+                <p className="text-[11px] md:text-xs text-slate-300 truncate">
                   Stream stalled. Loading {autoSwitchingTo}...
                 </p>
               </div>
