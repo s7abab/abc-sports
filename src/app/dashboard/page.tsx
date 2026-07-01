@@ -3,7 +3,13 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { VideoPlayer } from "@/components/video-player";
-import { Tv, Sparkles, Loader2, Copy, Check, Settings, Save, ExternalLink, X } from "lucide-react";
+import type { MatchConfig } from "@/lib/match-storage";
+import {
+  deriveRuntimeMatchStatus,
+  formatMatchDate,
+  type MatchStatus,
+} from "@/lib/match-utils";
+import { Tv, Sparkles, Loader2, Copy, Check, Settings, Save, ExternalLink, X, Plus, CalendarPlus, Pencil, Trash2, RotateCcw } from "lucide-react";
 
 interface PlayerConfig {
   id: string;
@@ -18,8 +24,24 @@ interface PlayerConfig {
 }
 
 export default function DashboardPage() {
+  const [activeTab, setActiveTab] = useState<"matches" | "players">("matches");
   const [players, setPlayers] = useState<PlayerConfig[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [matches, setMatches] = useState<MatchConfig[]>([]);
+  const [isMatchesLoading, setIsMatchesLoading] = useState(true);
+  const [activeMatchFilter, setActiveMatchFilter] = useState<MatchStatus>("today");
+  const [editingMatch, setEditingMatch] = useState<MatchConfig | null>(null);
+  const [isSavingMatch, setIsSavingMatch] = useState(false);
+  const [matchError, setMatchError] = useState("");
+  const [matchForm, setMatchForm] = useState({
+    competition: "FIFA World Cup 2026",
+    date: "",
+    home: "",
+    away: "",
+    playerId: "1",
+    homeLogoUrl: "",
+    awayLogoUrl: "",
+  });
 
   // Single Player Configuration Modal State
   const [editingPlayer, setEditingPlayer] = useState<PlayerConfig | null>(null);
@@ -68,7 +90,22 @@ export default function DashboardPage() {
         setIsLoading(false);
       }
     }
+
+    async function fetchMatches() {
+      try {
+        const response = await fetch("/api/matches");
+        if (response.ok) {
+          const data = await response.json();
+          setMatches(data);
+        }
+      } catch (err) {
+        console.error("Error loading matches:", err);
+      } finally {
+        setIsMatchesLoading(false);
+      }
+    }
     fetchPlayers();
+    fetchMatches();
   }, []);
 
   const handleCopyLink = (id: string, e: React.MouseEvent) => {
@@ -315,6 +352,158 @@ export default function DashboardPage() {
     return player.servers["1"]?.url || player.servers["2"]?.url || player.servers["3"]?.url || player.servers["4"]?.url || "";
   };
 
+  const TeamLogoThumb = ({
+    name,
+    logoUrl,
+  }: {
+    name: string;
+    logoUrl: string;
+  }) =>
+    logoUrl ? (
+      <div className="h-10 w-10 overflow-hidden rounded-full border border-white/10 bg-white/5">
+        <img src={logoUrl} alt={`${name} logo`} className="h-full w-full object-cover" />
+      </div>
+    ) : (
+      <div className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/5 text-[11px] font-bold uppercase text-slate-200">
+        {name.slice(0, 2)}
+      </div>
+    );
+
+  const toDateTimeLocalValue = (value: string) => {
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) {
+      return value;
+    }
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return `${value}T00:00`;
+    }
+
+    return value;
+  };
+
+  const handleOpenMatchEdit = (match: MatchConfig) => {
+    setEditingMatch(match);
+    setMatchError("");
+    setMatchForm({
+      competition: match.competition,
+      date: toDateTimeLocalValue(match.date),
+      home: match.home,
+      away: match.away,
+      playerId: match.playerId || "1",
+      homeLogoUrl: match.homeLogoUrl || "",
+      awayLogoUrl: match.awayLogoUrl || "",
+    });
+  };
+
+  const handleStartNewMatch = () => {
+    setEditingMatch(null);
+    setMatchError("");
+    setMatchForm({
+      competition: "FIFA World Cup 2026",
+      date: "",
+      home: "",
+      away: "",
+      playerId: players[0]?.id || "1",
+      homeLogoUrl: "",
+      awayLogoUrl: "",
+    });
+  };
+
+  const handleDeleteMatch = async (match: MatchConfig) => {
+    const confirmed = window.confirm(`Delete ${match.home} vs ${match.away}?`);
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(`/api/matches/${match.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        setMatchError(data.error || "Failed to delete match.");
+        return;
+      }
+
+      setMatches((prev) => prev.filter((item) => item.id !== match.id));
+      if (editingMatch?.id === match.id) {
+        handleStartNewMatch();
+      }
+    } catch (err) {
+      setMatchError("An error occurred while deleting the match.");
+    }
+  };
+
+  const handleCreateMatch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMatchError("");
+    setIsSavingMatch(true);
+
+    const payload = {
+      competition: matchForm.competition.trim(),
+      date: matchForm.date.trim(),
+      home: matchForm.home.trim(),
+      away: matchForm.away.trim(),
+      playerId: matchForm.playerId || players[0]?.id || "1",
+      homeLogoUrl: matchForm.homeLogoUrl.trim(),
+      awayLogoUrl: matchForm.awayLogoUrl.trim(),
+      live: deriveRuntimeMatchStatus(matchForm.date) === "live",
+    };
+
+    if (!payload.competition || !payload.date || !payload.home || !payload.away) {
+      setMatchError("Fill in competition, date, home team, and away team.");
+      setIsSavingMatch(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        editingMatch ? `/api/matches/${editingMatch.id}` : "/api/matches",
+        {
+          method: editingMatch ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        setMatchError(data.error || "Failed to save match.");
+        return;
+      }
+
+      const data = await response.json();
+      setMatches((prev) =>
+        editingMatch
+          ? prev.map((match) => (match.id === editingMatch.id ? data.match : match))
+          : [...prev, data.match]
+      );
+      setEditingMatch(null);
+      setMatchForm({
+        competition: "FIFA World Cup 2026",
+        date: "",
+        home: "",
+        away: "",
+        playerId: players[0]?.id || "1",
+        homeLogoUrl: "",
+        awayLogoUrl: "",
+      });
+    } catch (err) {
+      setMatchError("An error occurred while saving the match.");
+    } finally {
+      setIsSavingMatch(false);
+    }
+  };
+
+  const filteredMatches = matches.filter((match) => {
+    const matchStatus = deriveRuntimeMatchStatus(match.date);
+
+    if (activeMatchFilter === "today") {
+      return matchStatus === "today" || matchStatus === "live";
+    }
+
+    return matchStatus === activeMatchFilter;
+  });
+
   return (
     <main className="min-h-screen bg-[#09090b] text-slate-100 flex flex-col p-3 md:p-5 relative overflow-x-hidden animate-in fade-in duration-300">
       {/* Decorative gradient overlay */}
@@ -338,41 +527,349 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-3 self-start sm:self-auto">
-            {/* Live Indicator */}
-            <div className="flex items-center gap-2 bg-rose-500/10 border border-rose-500/25 px-3 py-1.5 rounded-xl">
-              <span className="flex h-2.5 w-2.5 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
+            <div className="flex items-center gap-2 rounded-xl border border-rose-500/25 bg-rose-500/10 px-3 py-1.5">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75"></span>
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-rose-500"></span>
               </span>
-              <span className="text-[10px] font-bold text-rose-400 uppercase tracking-widest leading-none">
+              <span className="text-[10px] font-bold uppercase tracking-widest leading-none text-rose-400">
                 Live Grid
               </span>
             </div>
 
-            {/* Main Configure Button (Top Right) */}
-            <button
-              onClick={handleOpenBulkEdit}
-              className="flex items-center gap-2 px-4 py-1.5 bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 text-xs font-semibold text-slate-200 rounded-xl transition-all duration-200 cursor-pointer"
-            >
-              <Settings className="h-3.5 w-3.5" />
-              <span>Configure Streams</span>
-            </button>
+            {activeTab === "players" ? (
+              <button
+                onClick={handleOpenBulkEdit}
+                className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-semibold text-slate-200 transition-all duration-200 hover:border-white/20 hover:bg-white/10"
+              >
+                <Settings className="h-3.5 w-3.5" />
+                <span>Configure Streams</span>
+              </button>
+            ) : (
+              <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-semibold text-slate-300">
+                Match tools
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Players Grid */}
-        {isLoading ? (
-          <div className="flex-grow flex flex-col items-center justify-center py-40 gap-3">
-            <Loader2 className="h-8 w-8 text-violet-500 animate-spin" />
-            <p className="text-xs text-slate-400">Loading feeds...</p>
-          </div>
+        <div className="flex items-center gap-2 px-1 pt-1">
+          <button
+            type="button"
+            onClick={() => setActiveTab("matches")}
+            className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] transition ${
+              activeTab === "matches"
+                ? "bg-white text-[#09090b]"
+                : "border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+            }`}
+          >
+            Matches
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("players")}
+            className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] transition ${
+              activeTab === "players"
+                ? "bg-white text-[#09090b]"
+                : "border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+            }`}
+          >
+            Players
+          </button>
+        </div>
+
+        {activeTab === "matches" ? (
+          <section className="grid gap-4 xl:grid-cols-[0.88fr_1.12fr]">
+            <div className="rounded-2xl border border-white/5 bg-[#0f0f13] p-4 shadow-xl shadow-black/10">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <CalendarPlus className="h-4 w-4 text-violet-400" />
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-white">
+                    {editingMatch ? "Edit Match" : "Create Match"}
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleStartNewMatch}
+                  className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-300 transition hover:bg-white/10"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  New match
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateMatch} className="mt-4 space-y-3">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="space-y-1.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                      Competition
+                    </span>
+                    <input
+                      type="text"
+                      value={matchForm.competition}
+                      onChange={(e) =>
+                        setMatchForm((prev) => ({ ...prev, competition: e.target.value }))
+                      }
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition focus:border-violet-500/50"
+                    />
+                    <p className="text-[10px] text-slate-500">Example: FIFA World Cup 2026</p>
+                  </label>
+                  <label className="space-y-1.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                      Date & time
+                    </span>
+                    <input
+                      type="datetime-local"
+                      value={matchForm.date}
+                      onChange={(e) => setMatchForm((prev) => ({ ...prev, date: e.target.value }))}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition focus:border-violet-500/50"
+                    />
+                    <p className="text-[10px] text-slate-500">Stored with match start time.</p>
+                  </label>
+              </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="space-y-1.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                      Home team
+                    </span>
+                    <input
+                      type="text"
+                      value={matchForm.home}
+                      onChange={(e) => setMatchForm((prev) => ({ ...prev, home: e.target.value }))}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition focus:border-violet-500/50"
+                    />
+                    <p className="text-[10px] text-slate-500">Team name shown on the card.</p>
+                  </label>
+                  <label className="space-y-1.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                      Away team
+                    </span>
+                    <input
+                      type="text"
+                      value={matchForm.away}
+                      onChange={(e) => setMatchForm((prev) => ({ ...prev, away: e.target.value }))}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition focus:border-violet-500/50"
+                    />
+                    <p className="text-[10px] text-slate-500">Team name shown on the card.</p>
+                  </label>
+                </div>
+
+                <label className="space-y-1.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                    Player
+                  </span>
+                  <select
+                    value={matchForm.playerId}
+                    onChange={(e) =>
+                      setMatchForm((prev) => ({ ...prev, playerId: e.target.value }))
+                    }
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white outline-none transition focus:border-violet-500/50"
+                  >
+                    {players.map((player) => (
+                      <option key={player.id} value={player.id}>
+                        {player.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-slate-500">Clicking this match opens that player.</p>
+                </label>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="space-y-1.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                      Home logo URL
+                    </span>
+                    <input
+                      type="url"
+                      value={matchForm.homeLogoUrl}
+                      onChange={(e) =>
+                        setMatchForm((prev) => ({ ...prev, homeLogoUrl: e.target.value }))
+                      }
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition focus:border-violet-500/50"
+                    />
+                    <p className="text-[10px] text-slate-500">Optional direct image URL.</p>
+                  </label>
+                  <label className="space-y-1.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                      Away logo URL
+                    </span>
+                    <input
+                      type="url"
+                      value={matchForm.awayLogoUrl}
+                      onChange={(e) =>
+                        setMatchForm((prev) => ({ ...prev, awayLogoUrl: e.target.value }))
+                      }
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition focus:border-violet-500/50"
+                    />
+                    <p className="text-[10px] text-slate-500">Optional direct image URL.</p>
+                  </label>
+                </div>
+                {matchError ? (
+                  <p className="text-xs font-medium text-rose-300">{matchError}</p>
+                ) : null}
+
+                <button
+                  type="submit"
+                  disabled={isSavingMatch}
+                  className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  <Plus className="h-4 w-4" />
+                  {isSavingMatch ? "Saving..." : editingMatch ? "Update match" : "Create match"}
+                </button>
+              </form>
+            </div>
+
+            <div className="rounded-2xl border border-white/5 bg-[#0f0f13] p-4 shadow-xl shadow-black/10">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Tv className="h-4 w-4 text-sky-400" />
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-white">
+                    Match List
+                  </h2>
+                </div>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                  SQLite
+                </span>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                {(["today", "upcoming", "completed"] as MatchStatus[]).map((status) => (
+                  <button
+                    key={status}
+                    type="button"
+                    onClick={() => setActiveMatchFilter(status)}
+                    className={`rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] transition ${
+                      activeMatchFilter === status
+                        ? "bg-white text-[#09090b]"
+                        : "border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+                    }`}
+                  >
+                    {status}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {isMatchesLoading ? (
+                  <div className="flex items-center gap-2 rounded-xl border border-white/5 bg-white/5 px-3 py-3 text-sm text-slate-400">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading matches...
+                  </div>
+                ) : filteredMatches.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-white/10 bg-white/5 px-3 py-4 text-sm text-slate-400">
+                    No {activeMatchFilter} matches yet.
+                  </div>
+                ) : (
+                  filteredMatches.map((match) => {
+                    const matchStatus = deriveRuntimeMatchStatus(match.date);
+
+                    return (
+                    <div
+                      key={match.id}
+                      className="rounded-2xl border border-white/5 bg-white/[0.03] p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+                            {match.competition}
+                          </p>
+                          <div className="mt-2 flex items-center gap-2">
+                            <TeamLogoThumb name={match.home} logoUrl={match.homeLogoUrl} />
+                            <span className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                              vs
+                            </span>
+                            <TeamLogoThumb name={match.away} logoUrl={match.awayLogoUrl} />
+                          </div>
+                          <h3 className="mt-2 truncate text-base font-semibold text-white">
+                            {match.home} vs {match.away}
+                          </h3>
+                          <p className="mt-1 text-xs text-slate-400">
+                            {formatMatchDate(match.date)}
+                          </p>
+                          <div className="mt-2 flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-slate-500">
+                            <span>{match.homeLogoUrl ? "Home logo set" : "Home logo missing"}</span>
+                            <span>•</span>
+                            <span>{match.awayLogoUrl ? "Away logo set" : "Away logo missing"}</span>
+                            <span>•</span>
+                            <span>
+                              {players.find((player) => player.id === match.playerId)?.name ||
+                                `Player ${match.playerId}`}
+                            </span>
+                          </div>
+                        </div>
+                        <span
+                          className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wider ${
+                              matchStatus === "live"
+                                ? "bg-rose-500 text-white"
+                                : matchStatus === "today"
+                                ? "bg-rose-500/15 text-rose-300"
+                                : matchStatus === "completed"
+                                  ? "bg-emerald-500/15 text-emerald-300"
+                                  : "bg-white/5 text-slate-400"
+                            }`}
+                          >
+                            {matchStatus}
+                          </span>
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenMatchEdit(match)}
+                            className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-300 transition hover:bg-white/10"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteMatch(match)}
+                            className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-rose-300 transition hover:bg-rose-500/10"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </section>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {players.map((player) => (
-              <div
-                key={player.id}
-                className="group flex flex-col bg-[#0f0f13] border border-white/5 rounded-2xl p-3 hover:border-violet-500/20 hover:shadow-xl hover:shadow-violet-950/5 transition-all duration-300 relative overflow-hidden"
-              >
+          <>
+            <div className="rounded-2xl border border-white/5 bg-[#0f0f13] p-4 shadow-xl shadow-black/10">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Tv className="h-4 w-4 text-sky-400" />
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-white">
+                    Players
+                  </h2>
+                </div>
+                <button
+                  onClick={handleOpenBulkEdit}
+                  className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:bg-white/10"
+                >
+                  <Settings className="h-3.5 w-3.5" />
+                  Configure Streams
+                </button>
+              </div>
+            </div>
+
+            {isLoading ? (
+              <div className="flex-grow flex flex-col items-center justify-center py-40 gap-3">
+                <Loader2 className="h-8 w-8 text-violet-500 animate-spin" />
+                <p className="text-xs text-slate-400">Loading feeds...</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {players.map((player) => (
+                  <div
+                    key={player.id}
+                    className="group flex flex-col bg-[#0f0f13] border border-white/5 rounded-2xl p-3 hover:border-violet-500/20 hover:shadow-xl hover:shadow-violet-950/5 transition-all duration-300 relative overflow-hidden"
+                  >
                 {/* Header label for each player */}
                 <div className="flex items-center justify-between mb-2.5 px-1">
                   <Link
@@ -482,8 +979,10 @@ export default function DashboardPage() {
                   </Link>
                 )}
               </div>
-            ))}
-          </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
 
         {/* Footnote information */}

@@ -6,8 +6,11 @@
 @import "@vidstack/react/player/styles/default/layouts/video.css";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #06070b;
+  --foreground: #ffffff;
+  --font-geist-sans: var(--font-space-grotesk), Arial, Helvetica, sans-serif;
+  --font-geist-mono: var(--font-ibm-plex-mono), "SFMono-Regular", Consolas, "Liberation Mono",
+    monospace;
 }
 
 @theme inline {
@@ -17,17 +20,29 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: rgba(74, 223, 255, 0.22);
+  color: #ffffff;
 }
 
 /* Custom HLS Video Object-Fit Overrides */
