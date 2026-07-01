@@ -3,44 +3,52 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { VideoPlayer } from "@/components/video-player";
-import { Tv, Sparkles, Loader2, Copy, Check, Settings, Lock, Save, ExternalLink, X, Link2 } from "lucide-react";
+import { Tv, Sparkles, Loader2, Copy, Check, Settings, Save, ExternalLink, X, Link2 } from "lucide-react";
 
 interface PlayerConfig {
   id: string;
   name: string;
-  url: string;
+  servers: {
+    "1": { name: string; url: string };
+    "2": { name: string; url: string };
+    "3": { name: string; url: string };
+    "4": { name: string; url: string };
+  };
 }
 
 export default function DashboardPage() {
   const [players, setPlayers] = useState<PlayerConfig[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Authorization State (Kept to lock the entire dashboard)
-  const [passcode, setPasscode] = useState("");
-  const [isAuthorized, setIsAuthorized] = useState(false);
-  const [passcodeError, setPasscodeError] = useState("");
-
-  // Inline Configuration State
-  const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
-  const [inputUrl, setInputUrl] = useState("");
+  // Single Player Configuration Modal State
+  const [editingPlayer, setEditingPlayer] = useState<PlayerConfig | null>(null);
+  const [inputUrls, setInputUrls] = useState<{
+    "1": { name: string; url: string };
+    "2": { name: string; url: string };
+    "3": { name: string; url: string };
+    "4": { name: string; url: string };
+  }>({
+    "1": { name: "", url: "" },
+    "2": { name: "", url: "" },
+    "3": { name: "", url: "" },
+    "4": { name: "", url: "" },
+  });
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
-  // Bulk Configuration State
+  // Bulk Configuration Modal State
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
-  const [bulkInputUrls, setBulkInputUrls] = useState<{ [key: string]: string }>({});
+  const [activeBulkTab, setActiveBulkTab] = useState<string>("1");
+  const [bulkInputUrls, setBulkInputUrls] = useState<{
+    [key: string]: {
+      "1": { name: string; url: string };
+      "2": { name: string; url: string };
+      "3": { name: string; url: string };
+      "4": { name: string; url: string };
+    };
+  }>({});
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
-
-  // Load passcode verification status from sessionStorage
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const auth = sessionStorage.getItem("dashboard_authorized");
-      if (auth === "true") {
-        setIsAuthorized(true);
-      }
-    }
-  }, []);
 
   // Fetch current configurations
   useEffect(() => {
@@ -74,60 +82,89 @@ export default function DashboardPage() {
       });
   };
 
-  const handleToggleEdit = (player: PlayerConfig, e: React.MouseEvent) => {
+  const handleOpenSingleEdit = (player: PlayerConfig, e: React.MouseEvent) => {
     e.stopPropagation(); // Avoid triggering details card navigation
-    setEditingPlayerId(player.id);
-    setInputUrl(player.url);
+    setEditingPlayer(player);
+    setInputUrls({
+      "1": { name: player.servers?.["1"]?.name || "", url: player.servers?.["1"]?.url || "" },
+      "2": { name: player.servers?.["2"]?.name || "", url: player.servers?.["2"]?.url || "" },
+      "3": { name: player.servers?.["3"]?.name || "", url: player.servers?.["3"]?.url || "" },
+      "4": { name: player.servers?.["4"]?.name || "", url: player.servers?.["4"]?.url || "" },
+    });
     setSaveError("");
   };
 
   const handleOpenBulkEdit = () => {
-    const urls: { [key: string]: string } = {};
+    const urls: {
+      [key: string]: {
+        "1": { name: string; url: string };
+        "2": { name: string; url: string };
+        "3": { name: string; url: string };
+        "4": { name: string; url: string };
+      };
+    } = {};
     players.forEach((p) => {
-      urls[p.id] = p.url;
+      urls[p.id] = {
+        "1": { name: p.servers?.["1"]?.name || "", url: p.servers?.["1"]?.url || "" },
+        "2": { name: p.servers?.["2"]?.name || "", url: p.servers?.["2"]?.url || "" },
+        "3": { name: p.servers?.["3"]?.name || "", url: p.servers?.["3"]?.url || "" },
+        "4": { name: p.servers?.["4"]?.name || "", url: p.servers?.["4"]?.url || "" },
+      };
     });
     setBulkInputUrls(urls);
     setSaveError("");
+    if (players.length > 0) {
+      setActiveBulkTab(players[0].id);
+    }
     setIsBulkEditOpen(true);
   };
 
-  const handlePasscodeSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (passcode === "23929199") {
-      setIsAuthorized(true);
-      setPasscodeError("");
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem("dashboard_authorized", "true");
-      }
-    } else {
-      setPasscodeError("Incorrect passcode.");
-    }
+  const handleInlineUrlChange = (slot: "1" | "2" | "3" | "4", val: string) => {
+    setInputUrls((prev) => ({
+      ...prev,
+      [slot]: {
+        ...prev[slot],
+        url: val,
+      },
+    }));
+  };
+
+  const handleInlineNameChange = (slot: "1" | "2" | "3" | "4", val: string) => {
+    setInputUrls((prev) => ({
+      ...prev,
+      [slot]: {
+        ...prev[slot],
+        name: val,
+      },
+    }));
   };
 
   const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!editingPlayer) return;
     setIsSaving(true);
     setSaveError("");
 
     // Simple URL validation
-    if (inputUrl) {
+    const invalidUrl = Object.values(inputUrls).some((slot) => {
+      if (!slot.url) return false;
       try {
-        const parsed = new URL(inputUrl);
-        if (!["http:", "https:"].includes(parsed.protocol)) {
-          setSaveError("Invalid protocol. Use http/https.");
-          setIsSaving(false);
-          return;
-        }
+        const parsed = new URL(slot.url);
+        return !["http:", "https:"].includes(parsed.protocol);
       } catch {
-        setSaveError("Please enter a valid URL.");
-        setIsSaving(false);
-        return;
+        return true;
       }
+    });
+
+    if (invalidUrl) {
+      setSaveError("Please enter valid stream URLs (starting with http/https).");
+      setIsSaving(false);
+      return;
     }
 
     try {
       const updatedPlayers = players.map((p) =>
-        p.id === editingPlayerId ? { ...p, url: inputUrl } : p
+        p.id === editingPlayer.id ? { ...p, servers: inputUrls } : p
       );
 
       const response = await fetch("/api/players", {
@@ -138,7 +175,7 @@ export default function DashboardPage() {
 
       if (response.ok) {
         setPlayers(updatedPlayers);
-        setEditingPlayerId(null);
+        setEditingPlayer(null);
       } else {
         const data = await response.json();
         setSaveError(data.error || "Failed to save configuration.");
@@ -150,10 +187,29 @@ export default function DashboardPage() {
     }
   };
 
-  const handleBulkUrlChange = (id: string, newUrl: string) => {
+  const handleBulkUrlChange = (playerId: string, slot: "1" | "2" | "3" | "4", val: string) => {
     setBulkInputUrls((prev) => ({
       ...prev,
-      [id]: newUrl,
+      [playerId]: {
+        ...prev[playerId],
+        [slot]: {
+          ...prev[playerId][slot],
+          url: val,
+        },
+      },
+    }));
+  };
+
+  const handleBulkNameChange = (playerId: string, slot: "1" | "2" | "3" | "4", val: string) => {
+    setBulkInputUrls((prev) => ({
+      ...prev,
+      [playerId]: {
+        ...prev[playerId],
+        [slot]: {
+          ...prev[playerId][slot],
+          name: val,
+        },
+      },
     }));
   };
 
@@ -163,14 +219,19 @@ export default function DashboardPage() {
     setSaveError("");
 
     // Validate all input URLs
-    const hasInvalidUrl = Object.values(bulkInputUrls).some((url) => {
-      if (!url) return false;
-      try {
-        const parsed = new URL(url);
-        return !["http:", "https:"].includes(parsed.protocol);
-      } catch {
-        return true;
-      }
+    let hasInvalidUrl = false;
+    Object.values(bulkInputUrls).forEach((slotMap) => {
+      Object.values(slotMap).forEach((slot) => {
+        if (!slot.url) return;
+        try {
+          const parsed = new URL(slot.url);
+          if (!["http:", "https:"].includes(parsed.protocol)) {
+            hasInvalidUrl = true;
+          }
+        } catch {
+          hasInvalidUrl = true;
+        }
+      });
     });
 
     if (hasInvalidUrl) {
@@ -182,7 +243,7 @@ export default function DashboardPage() {
     try {
       const updatedPlayers = players.map((p) => ({
         ...p,
-        url: bulkInputUrls[p.id] ?? p.url,
+        servers: bulkInputUrls[p.id] || p.servers,
       }));
 
       const response = await fetch("/api/players", {
@@ -205,73 +266,17 @@ export default function DashboardPage() {
     }
   };
 
-  // Render Passcode Screen if Not Authorized
-  if (!isAuthorized) {
-    return (
-      <main className="min-h-screen bg-[#09090b] text-slate-100 flex flex-col items-center justify-center p-4 relative overflow-hidden">
-        {/* Decorative gradient overlay */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-violet-950/20 via-[#09090b] to-[#09090b] pointer-events-none z-0"></div>
+  const getActiveStreamUrl = (player: PlayerConfig): string => {
+    if (!player.servers) return "";
+    return player.servers["1"]?.url || player.servers["2"]?.url || player.servers["3"]?.url || player.servers["4"]?.url || "";
+  };
 
-        <div className="w-full max-w-md mx-auto z-10 py-12 animate-in fade-in duration-300">
-          <div className="bg-[#0f0f13] border border-white/5 rounded-2xl p-6 md:p-8 shadow-2xl relative flex flex-col items-center">
-            <div className="h-12 w-12 rounded-full bg-violet-600/10 border border-violet-500/20 flex items-center justify-center mb-4">
-              <Lock className="h-5 w-5 text-violet-400" />
-            </div>
-
-            <h2 className="text-base font-bold tracking-tight text-white mb-1">
-              Control Room Access
-            </h2>
-            <p className="text-[10px] text-slate-400 text-center mb-6">
-              Enter passcode to unlock multiscreen broadcast dashboard
-            </p>
-
-            <form onSubmit={handlePasscodeSubmit} className="w-full space-y-4">
-              <div>
-                <input
-                  type="password"
-                  name="control-room-access-passcode"
-                  autoComplete="new-password"
-                  value={passcode}
-                  onChange={(e) => setPasscode(e.target.value)}
-                  placeholder="Enter Passcode"
-                  className="w-full px-3.5 py-2.5 bg-black/40 border border-white/5 rounded-xl text-sm placeholder:text-slate-600 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20 text-center tracking-widest text-white transition-all"
-                  autoFocus
-                />
-              </div>
-
-              {passcodeError && (
-                <div className="flex items-center gap-2 text-rose-400 text-xs justify-center bg-rose-500/5 py-2 px-3 rounded-lg border border-rose-500/10">
-                  <span>{passcodeError}</span>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                className="w-full py-2.5 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-xs font-bold text-white rounded-xl shadow-lg shadow-violet-500/10 active:scale-95 transition-all duration-150 cursor-pointer"
-              >
-                Unlock Dashboard
-              </button>
-            </form>
-
-            <Link
-              href="/"
-              className="text-[10px] text-slate-500 hover:text-slate-300 mt-6 flex items-center gap-1.5 transition-all"
-            >
-              Cancel & Go Home
-            </Link>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  // Render Full Dashboard Grid Screen if Authorized
   return (
-    <main className="min-h-screen bg-[#09090b] text-slate-100 flex flex-col p-4 md:p-8 relative overflow-x-hidden animate-in fade-in duration-300">
+    <main className="min-h-screen bg-[#09090b] text-slate-100 flex flex-col p-3 md:p-5 relative overflow-x-hidden animate-in fade-in duration-300">
       {/* Decorative gradient overlay */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-violet-950/20 via-[#09090b] to-[#09090b] pointer-events-none z-0"></div>
 
-      <div className="w-full max-w-7xl mx-auto space-y-6 z-10 flex-grow flex flex-col">
+      <div className="w-full max-w-7xl mx-auto space-y-4 z-10 flex-grow flex flex-col">
         {/* Header section with live badge */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1">
           <div className="flex items-center gap-3">
@@ -318,7 +323,7 @@ export default function DashboardPage() {
             <p className="text-xs text-slate-400">Loading feeds...</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {players.map((player) => (
               <div
                 key={player.id}
@@ -359,7 +364,7 @@ export default function DashboardPage() {
                     {/* Configure Button */}
                     <button
                       type="button"
-                      onClick={(e) => handleToggleEdit(player, e)}
+                      onClick={(e) => handleOpenSingleEdit(player, e)}
                       className="flex items-center gap-1 text-[9px] font-medium text-slate-400 hover:text-white bg-white/[0.03] border border-white/5 hover:bg-white/[0.08] px-2 py-0.5 rounded-md transition-all active:scale-95 duration-150 cursor-pointer"
                       title="Configure stream feed"
                     >
@@ -368,7 +373,7 @@ export default function DashboardPage() {
                     </button>
 
                     {/* Status Badge */}
-                    {player.url ? (
+                    {getActiveStreamUrl(player) ? (
                       <span className="text-[9px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full select-none">
                         ACTIVE
                       </span>
@@ -380,52 +385,11 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {/* Video Player, Config Form, or Offline Placeholder */}
-                {editingPlayerId === player.id ? (
-                  <div className="aspect-video w-full rounded-xl bg-black/60 border border-violet-500/20 p-4 flex flex-col justify-center relative select-none">
-                    <form onSubmit={handleSaveConfig} className="w-full space-y-2 flex flex-col">
-                      <span className="text-[9px] font-bold text-slate-300 mb-0.5 flex items-center gap-1.5">
-                        <Settings className="h-3 w-3 text-violet-400" />
-                        Configure Stream Source
-                      </span>
-                      <input
-                        type="text"
-                        value={inputUrl}
-                        onChange={(e) => setInputUrl(e.target.value)}
-                        placeholder="Stream URL (https://.../stream.m3u8)"
-                        className="w-full px-2.5 py-1 bg-black/80 border border-white/5 rounded-md text-[10px] placeholder:text-slate-600 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20 text-slate-100 transition-all font-mono"
-                        autoFocus
-                      />
-                      {saveError && (
-                        <span className="text-[8px] text-rose-400 font-semibold">{saveError}</span>
-                      )}
-                      <div className="flex gap-2 w-full mt-1 justify-end">
-                        <button
-                          type="button"
-                          onClick={() => setEditingPlayerId(null)}
-                          className="px-3 py-1 bg-white/5 hover:bg-white/10 text-[9px] font-bold text-slate-300 rounded-md transition-all cursor-pointer"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          disabled={isSaving}
-                          className="px-3 py-1 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-[9px] font-bold text-white rounded-md transition-all flex items-center justify-center gap-1 disabled:opacity-50 cursor-pointer"
-                        >
-                          {isSaving ? (
-                            <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                          ) : (
-                            <Save className="h-2.5 w-2.5" />
-                          )}
-                          Save
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                ) : player.url ? (
+                {/* Video Player or Offline Placeholder */}
+                {getActiveStreamUrl(player) ? (
                   <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
                     <VideoPlayer
-                      src={player.url}
+                      src={getActiveStreamUrl(player)}
                       title={player.name}
                       muted={true}
                       autoPlay={true}
@@ -462,10 +426,103 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Main Bulk Configure Modal Panel */}
+      {/* Focused Single Player Configure Modal */}
+      {editingPlayer && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#0f0f13] border border-white/10 rounded-2xl w-full max-w-xl flex flex-col shadow-2xl p-6 relative overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[90vh]">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-white/5">
+              <div className="flex items-center gap-2">
+                <Settings className="h-5 w-5 text-violet-500" />
+                <h2 className="text-xs font-bold text-white uppercase tracking-wider">
+                  Configure {editingPlayer.name}
+                </h2>
+              </div>
+              <button
+                onClick={() => setEditingPlayer(null)}
+                className="h-7 w-7 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4 text-slate-400 hover:text-white" />
+              </button>
+            </div>
+
+            {/* Form wrapping scrollable content and fixed actions */}
+            <form onSubmit={handleSaveConfig} className="flex flex-col flex-grow overflow-hidden mt-4">
+              {/* Scrollable Form Body */}
+              <div className="space-y-4 overflow-y-auto max-h-[50vh] pr-1 flex-grow mb-4">
+                {(["1", "2", "3", "4"] as const).map((slot) => (
+                  <div key={slot} className="bg-black/40 border border-white/5 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-violet-400">Server Slot {slot}</span>
+                      {inputUrls[slot].url && (
+                        <span className="text-[8px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="sm:col-span-1">
+                        <label className="text-[9px] text-slate-400 font-bold block mb-1 uppercase tracking-wider">Label</label>
+                        <input
+                          type="text"
+                          value={inputUrls[slot].name}
+                          onChange={(e) => handleInlineNameChange(slot, e.target.value)}
+                          placeholder={`Server ${slot}`}
+                          className="w-full px-3 py-1.5 bg-black/60 border border-white/10 rounded-lg text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-violet-500/50"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="text-[9px] text-slate-400 font-bold block mb-1 uppercase tracking-wider">HLS URL</label>
+                        <input
+                          type="text"
+                          value={inputUrls[slot].url}
+                          onChange={(e) => handleInlineUrlChange(slot, e.target.value)}
+                          placeholder="https://example.com/stream.m3u8"
+                          className="w-full px-3 py-1.5 bg-black/60 border border-white/10 rounded-lg text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-violet-500/50 font-mono"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {saveError && (
+                  <div className="text-rose-400 text-[10px] bg-rose-500/5 py-2 px-3 rounded-lg border border-rose-500/10">
+                    <span>{saveError}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Fixed Action Footer */}
+              <div className="flex gap-3 justify-end pt-4 border-t border-white/5 mt-auto">
+                <button
+                  type="button"
+                  onClick={() => setEditingPlayer(null)}
+                  className="px-4 py-2 bg-white/5 hover:bg-white/10 text-xs font-bold text-slate-300 rounded-xl transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="px-4 py-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-xs font-bold text-white rounded-xl shadow-lg shadow-violet-500/10 active:scale-95 transition-all duration-150 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                >
+                  {isSaving ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Save className="h-3.5 w-3.5" />
+                  )}
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Main Bulk Configure Modal Panel (With Player Tabs) */}
       {isBulkEditOpen && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#0f0f13] border border-white/10 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl p-6 relative overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-[#0f0f13] border border-white/10 rounded-2xl w-full max-w-2xl flex flex-col shadow-2xl p-6 relative overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[90vh]">
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-4 border-b border-white/5">
               <div className="flex items-center gap-2">
@@ -483,67 +540,94 @@ export default function DashboardPage() {
               </button>
             </div>
 
-            {/* Modal Body */}
-            <div className="overflow-y-auto pr-1 py-2 space-y-4 my-4 flex-grow">
-              <form onSubmit={handleSaveBulk} className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {players.map((player) => (
-                    <div
-                      key={player.id}
-                      className="group flex flex-col gap-2 p-3 bg-white/[0.01] border border-white/5 rounded-xl hover:border-white/10 hover:bg-white/[0.02] transition-all duration-200"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="h-5 w-5 rounded-md bg-violet-600/10 border border-violet-500/20 flex items-center justify-center text-[9px] font-bold text-violet-400">
-                          {player.id}
-                        </div>
-                        <label className="text-[11px] font-semibold text-slate-200">
-                          {player.name}
-                        </label>
-                      </div>
-                      <div className="relative flex items-center">
-                        <Link2 className="absolute left-2.5 h-3 w-3 text-slate-500 group-focus-within:text-violet-400 transition-colors" />
+            {/* Modal Player Navigation Tabs */}
+            <div className="flex border-b border-white/5 mt-4 gap-1">
+              {players.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setActiveBulkTab(p.id)}
+                  className="px-4 py-2 text-xs font-bold transition-all border-b-2 -mb-[1px] cursor-pointer"
+                  style={{
+                    borderColor: activeBulkTab === p.id ? "#8b5cf6" : "transparent",
+                    color: activeBulkTab === p.id ? "#ffffff" : "#94a3b8",
+                    backgroundColor: activeBulkTab === p.id ? "rgba(255,255,255,0.02)" : "transparent"
+                  }}
+                >
+                  {p.name}
+                </button>
+              ))}
+            </div>
+
+            {/* Form wrapping scrollable content and fixed actions */}
+            <form onSubmit={handleSaveBulk} className="flex flex-col flex-grow overflow-hidden mt-4">
+              {/* Scrollable Form Body */}
+              <div className="overflow-y-auto pr-1 py-2 space-y-3 flex-grow max-h-[48vh] mb-4">
+                {(["1", "2", "3", "4"] as const).map((slot) => (
+                  <div key={slot} className="bg-black/40 border border-white/5 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-violet-400">Server Slot {slot}</span>
+                      {bulkInputUrls[activeBulkTab]?.[slot]?.url && (
+                        <span className="text-[8px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="sm:col-span-1">
+                        <label className="text-[9px] text-slate-400 font-bold block mb-1 uppercase tracking-wider">Label</label>
                         <input
                           type="text"
-                          value={bulkInputUrls[player.id] ?? ""}
-                          onChange={(e) => handleBulkUrlChange(player.id, e.target.value)}
-                          placeholder="Stream URL (https://.../stream.m3u8)"
-                          className="w-full pl-8 pr-2 py-1.5 bg-black/60 border border-white/5 rounded-lg text-[10px] placeholder:text-slate-600 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20 text-slate-100 transition-all font-mono"
+                          value={bulkInputUrls[activeBulkTab]?.[slot]?.name ?? ""}
+                          onChange={(e) => handleBulkNameChange(activeBulkTab, slot, e.target.value)}
+                          placeholder={`Server ${slot}`}
+                          className="w-full px-3 py-1.5 bg-black/60 border border-white/10 rounded-lg text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-violet-500/50"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="text-[9px] text-slate-400 font-bold block mb-1 uppercase tracking-wider">HLS URL</label>
+                        <input
+                          type="text"
+                          value={bulkInputUrls[activeBulkTab]?.[slot]?.url ?? ""}
+                          onChange={(e) => handleBulkUrlChange(activeBulkTab, slot, e.target.value)}
+                          placeholder="https://example.com/stream.m3u8"
+                          className="w-full px-3 py-1.5 bg-black/60 border border-white/10 rounded-lg text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-violet-500/50 font-mono"
                         />
                       </div>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
 
                 {saveError && (
                   <div className="flex items-center gap-2 text-rose-400 text-[10px] bg-rose-500/5 py-2 px-3 rounded-lg border border-rose-500/10">
                     <span>{saveError}</span>
                   </div>
                 )}
+              </div>
 
-                {/* Modal Footer */}
-                <div className="flex gap-3 justify-end pt-4 border-t border-white/5 mt-6">
-                  <button
-                    type="button"
-                    onClick={() => setIsBulkEditOpen(false)}
-                    className="px-4 py-2 bg-white/5 hover:bg-white/10 text-xs font-bold text-slate-300 rounded-xl transition-all cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSaving}
-                    className="px-4 py-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-xs font-bold text-white rounded-xl shadow-lg shadow-violet-500/10 active:scale-95 transition-all duration-150 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
-                  >
-                    {isSaving ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Save className="h-3.5 w-3.5" />
-                    )}
-                    Save Configurations
-                  </button>
-                </div>
-              </form>
-            </div>
+              {/* Fixed Action Footer */}
+              <div className="flex gap-3 justify-end pt-4 border-t border-white/5 mt-auto">
+                <button
+                  type="button"
+                  onClick={() => setIsBulkEditOpen(false)}
+                  className="px-4 py-2 bg-white/5 hover:bg-white/10 text-xs font-bold text-slate-300 rounded-xl transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="px-4 py-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-xs font-bold text-white rounded-xl shadow-lg shadow-violet-500/10 active:scale-95 transition-all duration-150 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                >
+                  {isSaving ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Save className="h-3.5 w-3.5" />
+                  )}
+                  Save Configurations
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

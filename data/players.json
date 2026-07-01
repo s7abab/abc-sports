@@ -1,10 +1,90 @@
 [
-  { "id": "1", "name": "Player 1", "url": "https://play.gzxdby.com/live/183334344568_2547627111.m3u8" },
-  { "id": "2", "name": "Player 2", "url": "" },
-  { "id": "3", "name": "Player 3", "url": "" },
-  { "id": "4", "name": "Player 4", "url": "" },
-  { "id": "5", "name": "Player 5", "url": "" },
-  { "id": "6", "name": "Player 6", "url": "" },
-  { "id": "7", "name": "Player 7", "url": "" },
-  { "id": "8", "name": "Player 8", "url": "" }
+  {
+    "id": "1",
+    "name": "Player 1",
+    "servers": {
+      "1": {
+        "name": "Arabic",
+        "url": "https://play.gzxdby.com/live/183334344568_2547627111.m3u8"
+      },
+      "2": {
+        "name": "Server 2",
+        "url": "https://play.gzxdby.com/live/183334344568_2547627111.m3u8"
+      },
+      "3": {
+        "name": "",
+        "url": ""
+      },
+      "4": {
+        "name": "",
+        "url": ""
+      }
+    }
+  },
+  {
+    "id": "2",
+    "name": "Player 2",
+    "servers": {
+      "1": {
+        "name": "Arabic",
+        "url": ""
+      },
+      "2": {
+        "name": "",
+        "url": ""
+      },
+      "3": {
+        "name": "",
+        "url": ""
+      },
+      "4": {
+        "name": "",
+        "url": ""
+      }
+    }
+  },
+  {
+    "id": "3",
+    "name": "Player 3",
+    "servers": {
+      "1": {
+        "name": "",
+        "url": ""
+      },
+      "2": {
+        "name": "",
+        "url": ""
+      },
+      "3": {
+        "name": "",
+        "url": ""
+      },
+      "4": {
+        "name": "",
+        "url": ""
+      }
+    }
+  },
+  {
+    "id": "4",
+    "name": "Player 4",
+    "servers": {
+      "1": {
+        "name": "",
+        "url": ""
+      },
+      "2": {
+        "name": "",
+        "url": ""
+      },
+      "3": {
+        "name": "",
+        "url": ""
+      },
+      "4": {
+        "name": "",
+        "url": ""
+      }
+    }
+  }
 ]
