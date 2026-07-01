@@ -3,7 +3,7 @@
 import { MediaPlayer, MediaProvider, Poster, isHLSProvider, useMediaPlayer, useMediaStore, type MediaPlayerInstance, type MediaProviderAdapter } from "@vidstack/react";
 import { defaultLayoutIcons, DefaultVideoLayout } from "@vidstack/react/player/layouts/default";
 import { forwardRef, useState, useRef, useImperativeHandle, useEffect } from "react";
-import { MessageSquare, MessageSquareOff, Server } from "lucide-react";
+import { MessageSquare, MessageSquareOff, Server, Loader2 } from "lucide-react";
 import { LiveMatchChat } from "@/components/live-match-chat";
 
 interface VideoPlayerProps {
@@ -65,24 +65,46 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
     // Forward the ref to the parent component
     useImperativeHandle(ref, () => playerRef.current!);
 
-    // Subscribe to Vidstack's media store state (like fullscreen and waiting)
     const { fullscreen, waiting } = useMediaStore(playerRef);
     const [showSlowWarning, setShowSlowWarning] = useState(false);
+    const [autoSwitchingTo, setAutoSwitchingTo] = useState<string | null>(null);
 
     useEffect(() => {
-      let timer: NodeJS.Timeout;
+      let warningTimer: NodeJS.Timeout;
+      let switchTimer: NodeJS.Timeout;
+
       if (waiting) {
         // If waiting lasts for more than 4 seconds, show the warning
-        timer = setTimeout(() => {
+        warningTimer = setTimeout(() => {
           setShowSlowWarning(true);
         }, 4000);
+
+        // If waiting lasts for more than 10 seconds and multiple servers exist, auto-switch
+        if (servers.length > 1 && activeServerId && onServerChange) {
+          switchTimer = setTimeout(() => {
+            const currentIdx = servers.findIndex((s) => s.id === activeServerId);
+            if (currentIdx !== -1) {
+              const nextIdx = (currentIdx + 1) % servers.length;
+              const nextServer = servers[nextIdx];
+              setAutoSwitchingTo(nextServer.name);
+              onServerChange(nextServer.id);
+
+              // Auto-dismiss switching HUD after 4 seconds
+              setTimeout(() => {
+                setAutoSwitchingTo(null);
+              }, 4000);
+            }
+          }, 10000);
+        }
       } else {
         setShowSlowWarning(false);
       }
+
       return () => {
-        if (timer) clearTimeout(timer);
+        clearTimeout(warningTimer);
+        clearTimeout(switchTimer);
       };
-    }, [waiting]);
+    }, [waiting, servers, activeServerId, onServerChange]);
 
     const toggleFit = () => {
       setObjectFit((prev) => (prev === "contain" ? "fill" : "contain"));
@@ -266,6 +288,21 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                 <h4 className="text-xs font-bold text-slate-200">Slow Connection</h4>
                 <p className="text-[10px] leading-relaxed text-slate-400">
                   The stream buffer is catch-up loading. If it doesn't resume, try selecting another server.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Auto switching notification */}
+          {autoSwitchingTo && (
+            <div className="absolute top-4 left-4 right-4 sm:left-auto sm:w-[280px] bg-violet-950/90 backdrop-blur border border-violet-500/20 text-white rounded-xl p-3 flex items-center gap-3 shadow-2xl z-30 animate-in slide-in-from-top-4 duration-300 pointer-events-auto">
+              <div className="w-6 h-6 rounded-full bg-violet-500/20 flex items-center justify-center text-violet-400">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-bold">Switching Server</p>
+                <p className="text-[9px] text-slate-300 truncate">
+                  Stream stalled. Loading {autoSwitchingTo}...
                 </p>
               </div>
             </div>
