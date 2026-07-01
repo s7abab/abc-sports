@@ -242,7 +242,7 @@ export function LiveMatchChat({ playerId, roomTitle }: LiveMatchChatProps) {
   }
 
   return (
-    <aside className="flex h-[34rem] min-h-0 w-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0f1115]/95 shadow-2xl lg:h-full">
+    <aside className="flex h-[28rem] min-h-0 w-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0f1115]/95 shadow-2xl sm:h-[32rem] lg:sticky lg:top-6 lg:h-[min(72vh,38rem)] lg:min-h-[30rem]">
       <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
         <div className="flex min-w-0 items-center gap-3">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-300 text-emerald-950">

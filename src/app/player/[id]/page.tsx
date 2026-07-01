@@ -92,7 +92,7 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
             <p className="text-sm font-semibold text-rose-400">{error}</p>
           </div>
         ) : player && currentStreamUrl ? (
-          <div className="grid w-full gap-4 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-stretch">
+          <div className="grid w-full gap-4 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start">
             <div className="flex min-w-0 flex-col gap-4">
               <VideoPlayer
                 src={currentStreamUrl}
