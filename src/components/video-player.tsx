@@ -19,8 +19,8 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
     const [objectFit, setObjectFit] = useState<"contain" | "cover">("contain");
 
     const fitClass = objectFit === "cover" 
-      ? "[&_video]:object-cover [&_img]:object-cover" 
-      : "[&_video]:object-contain [&_img]:object-contain";
+      ? "[&_video]:!object-cover [&_img]:!object-cover" 
+      : "[&_video]:!object-contain [&_img]:!object-contain";
 
     const toggleFit = () => {
       setObjectFit((prev) => (prev === "contain" ? "cover" : "contain"));
