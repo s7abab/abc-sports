@@ -7,6 +7,7 @@ import type { MatchConfig } from "@/lib/match-storage";
 import {
   deriveRuntimeMatchStatus,
   formatMatchDate,
+  getLocalDateKey,
   type MatchStatus,
 } from "@/lib/match-utils";
 import { Tv, Sparkles, Loader2, Copy, Check, Settings, Save, ExternalLink, X, Plus, CalendarPlus, Pencil, Trash2, RotateCcw } from "lucide-react";
@@ -35,7 +36,8 @@ export default function DashboardPage() {
   const [matchError, setMatchError] = useState("");
   const [matchForm, setMatchForm] = useState({
     competition: "FIFA World Cup 2026",
-    date: "",
+    date: getLocalDateKey(),
+    time: "",
     home: "",
     away: "",
     playerId: "1",
@@ -74,6 +76,28 @@ export default function DashboardPage() {
   const [bulkPrimaryServers, setBulkPrimaryServers] = useState<{ [key: string]: string }>({});
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const getRelativeDateKey = (day: "today" | "tomorrow") => {
+    const now = new Date();
+    if (day === "today") {
+      return getLocalDateKey(now);
+    }
+
+    return getLocalDateKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+  };
+
+  const splitMatchDateTime = (value: string) => {
+    const [datePart = "", timePart = ""] = value.split("T");
+    return {
+      date: datePart,
+      time: timePart,
+    };
+  };
+
+  const composeMatchDateTime = (date: string, time: string) => {
+    const trimmedTime = time.trim();
+    return trimmedTime ? `${date}T${trimmedTime}` : date;
+  };
 
   // Fetch current configurations
   useEffect(() => {
@@ -369,24 +393,14 @@ export default function DashboardPage() {
       </div>
     );
 
-  const toDateTimeLocalValue = (value: string) => {
-    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) {
-      return value;
-    }
-
-    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      return `${value}T00:00`;
-    }
-
-    return value;
-  };
-
   const handleOpenMatchEdit = (match: MatchConfig) => {
     setEditingMatch(match);
     setMatchError("");
+    const { date, time } = splitMatchDateTime(match.date);
     setMatchForm({
       competition: match.competition,
-      date: toDateTimeLocalValue(match.date),
+      date: date || getRelativeDateKey("today"),
+      time,
       home: match.home,
       away: match.away,
       playerId: match.playerId || "1",
@@ -400,7 +414,8 @@ export default function DashboardPage() {
     setMatchError("");
     setMatchForm({
       competition: "FIFA World Cup 2026",
-      date: "",
+      date: getRelativeDateKey("today"),
+      time: "",
       home: "",
       away: "",
       playerId: players[0]?.id || "1",
@@ -438,15 +453,17 @@ export default function DashboardPage() {
     setMatchError("");
     setIsSavingMatch(true);
 
+    const date = composeMatchDateTime(matchForm.date, matchForm.time);
+
     const payload = {
       competition: matchForm.competition.trim(),
-      date: matchForm.date.trim(),
+      date,
       home: matchForm.home.trim(),
       away: matchForm.away.trim(),
       playerId: matchForm.playerId || players[0]?.id || "1",
       homeLogoUrl: matchForm.homeLogoUrl.trim(),
       awayLogoUrl: matchForm.awayLogoUrl.trim(),
-      live: deriveRuntimeMatchStatus(matchForm.date) === "live",
+      live: deriveRuntimeMatchStatus(date) === "live",
     };
 
     if (!payload.competition || !payload.date || !payload.home || !payload.away) {
@@ -480,7 +497,8 @@ export default function DashboardPage() {
       setEditingMatch(null);
       setMatchForm({
         competition: "FIFA World Cup 2026",
-        date: "",
+        date: getRelativeDateKey("today"),
+        time: "",
         home: "",
         away: "",
         playerId: players[0]?.id || "1",
@@ -616,17 +634,34 @@ export default function DashboardPage() {
                   </label>
                   <label className="space-y-1.5">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                      Date & time
+                      Date
                     </span>
                     <input
-                      type="datetime-local"
+                      type="date"
                       value={matchForm.date}
+                      min={getRelativeDateKey("today")}
+                      max={getRelativeDateKey("tomorrow")}
                       onChange={(e) => setMatchForm((prev) => ({ ...prev, date: e.target.value }))}
                       className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition focus:border-violet-500/50"
                     />
-                    <p className="text-[10px] text-slate-500">Stored with match start time.</p>
+                    <p className="text-[10px] text-slate-500">Pick today or tomorrow.</p>
                   </label>
-              </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="space-y-1.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                      Time
+                    </span>
+                    <input
+                      type="time"
+                      value={matchForm.time}
+                      onChange={(e) => setMatchForm((prev) => ({ ...prev, time: e.target.value }))}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition focus:border-violet-500/50"
+                    />
+                    <p className="text-[10px] text-slate-500">Optional, but recommended.</p>
+                  </label>
+                </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="space-y-1.5">
