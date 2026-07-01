@@ -490,7 +490,7 @@ export default function DashboardPage() {
         <div className="flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-500 px-1 py-4 border-t border-white/5 gap-2 mt-auto">
           <p className="flex items-center gap-1.5">
             <Sparkles className="h-3.5 w-3.5 text-violet-400" />
-            Click S1-S4 to hot-swap active feeds. Click "Configure" to update stream sources.
+            Click S1-S4 to hot-swap active feeds. Click &quot;Configure&quot; to update stream sources.
           </p>
           <p>Powered by Vidstack & Next.js</p>
         </div>
@@ -499,7 +499,7 @@ export default function DashboardPage() {
       {/* Focused Single Player Configure Modal */}
       {editingPlayer && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#0f0f13] border border-white/10 rounded-2xl w-full max-w-xl flex flex-col shadow-2xl p-6 relative overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[90vh]">
+          <div className="bg-[#0f0f13] border border-white/10 rounded-2xl w-full max-w-xl flex flex-col shadow-2xl p-6 relative overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] min-h-0">
             {/* Header */}
             <div className="flex items-center justify-between pb-4 border-b border-white/5">
               <div className="flex items-center gap-2">
@@ -517,9 +517,9 @@ export default function DashboardPage() {
             </div>
 
             {/* Form wrapping scrollable content and fixed actions */}
-            <form onSubmit={handleSaveConfig} className="flex flex-col flex-grow overflow-hidden mt-4">
+            <form onSubmit={handleSaveConfig} className="flex flex-col flex-1 min-h-0 mt-4">
               {/* Scrollable Form Body */}
-              <div className="space-y-4 overflow-y-auto max-h-[50vh] pr-1 flex-grow mb-4">
+              <div className="space-y-4 flex-1 min-h-0 overflow-y-auto pr-1 mb-4">
                 {(["1", "2", "3", "4"] as const).map((slot) => (
                   <div key={slot} className="bg-black/40 border border-white/5 rounded-xl p-4 space-y-3">
                     <div className="flex items-center justify-between">
@@ -576,7 +576,7 @@ export default function DashboardPage() {
               </div>
 
               {/* Fixed Action Footer */}
-              <div className="flex gap-3 justify-end pt-4 border-t border-white/5 mt-auto">
+              <div className="flex gap-3 justify-end pt-4 border-t border-white/5 mt-auto shrink-0">
                 <button
                   type="button"
                   onClick={() => setEditingPlayer(null)}
@@ -605,7 +605,7 @@ export default function DashboardPage() {
       {/* Main Bulk Configure Modal Panel (With Player Tabs) */}
       {isBulkEditOpen && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#0f0f13] border border-white/10 rounded-2xl w-full max-w-2xl flex flex-col shadow-2xl p-6 relative overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[90vh]">
+          <div className="bg-[#0f0f13] border border-white/10 rounded-2xl w-full max-w-2xl flex flex-col shadow-2xl p-6 relative overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] min-h-0">
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-4 border-b border-white/5">
               <div className="flex items-center gap-2">
@@ -643,9 +643,9 @@ export default function DashboardPage() {
             </div>
 
             {/* Form wrapping scrollable content and fixed actions */}
-            <form onSubmit={handleSaveBulk} className="flex flex-col flex-grow overflow-hidden mt-4">
+            <form onSubmit={handleSaveBulk} className="flex flex-col flex-1 min-h-0 mt-4">
               {/* Scrollable Form Body */}
-              <div className="overflow-y-auto pr-1 py-2 space-y-3 flex-grow max-h-[48vh] mb-4">
+              <div className="flex-1 min-h-0 overflow-y-auto pr-1 py-2 space-y-3 mb-4">
                 {(["1", "2", "3", "4"] as const).map((slot) => (
                   <div key={slot} className="bg-black/40 border border-white/5 rounded-xl p-4 space-y-3">
                     <div className="flex items-center justify-between">
@@ -702,7 +702,7 @@ export default function DashboardPage() {
               </div>
 
               {/* Fixed Action Footer */}
-              <div className="flex gap-3 justify-end pt-4 border-t border-white/5 mt-auto">
+              <div className="flex gap-3 justify-end pt-4 border-t border-white/5 mt-auto shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsBulkEditOpen(false)}
