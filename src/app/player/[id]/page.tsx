@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import Link from "next/link";
 import { VideoPlayer } from "@/components/video-player";
+import { LiveMatchChat } from "@/components/live-match-chat";
 import { Loader2 } from "lucide-react";
 
 interface PlayerConfig {
@@ -77,7 +77,7 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
       {/* Decorative gradient overlay */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-violet-950/20 via-[#09090b] to-[#09090b] pointer-events-none z-0"></div>
 
-      <div className="w-full max-w-5xl mx-auto px-4 py-6 md:py-10 z-10 flex-grow flex flex-col justify-center gap-6">
+      <div className="w-full max-w-7xl mx-auto px-4 py-6 md:py-10 z-10 flex-grow flex flex-col justify-center gap-6">
 
 
 
@@ -92,39 +92,39 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
             <p className="text-sm font-semibold text-rose-400">{error}</p>
           </div>
         ) : player && currentStreamUrl ? (
-          <div className="flex flex-col gap-4 w-full">
-            {/* The Video Container */}
-            <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black border border-white/10 shadow-2xl">
+          <div className="grid w-full gap-4 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-stretch">
+            <div className="flex min-w-0 flex-col gap-4">
               <VideoPlayer
                 src={currentStreamUrl}
                 title={player.name}
                 poster={poster}
                 autoPlay={true}
               />
+
+              {availableServers.length > 1 && (
+                <div className="bg-[#0f0f13] border border-white/5 rounded-2xl p-4 flex flex-col gap-2.5 shadow-xl">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
+                    Select Stream Server
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {availableServers.map((slot) => (
+                      <button
+                        key={slot}
+                        onClick={() => setActiveServerId(slot)}
+                        className={`flex-grow sm:flex-grow-0 px-4 py-2.5 text-xs font-bold rounded-xl transition-all duration-150 active:scale-95 cursor-pointer ${activeServerId === slot
+                          ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-500/20"
+                          : "bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/5"
+                          }`}
+                      >
+                        {player.servers[slot]?.name || `Server ${slot}`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Server Selector Bar - Positioned BELOW the video */}
-            {availableServers.length > 1 && (
-              <div className="bg-[#0f0f13] border border-white/5 rounded-2xl p-4 flex flex-col gap-2.5 shadow-xl">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
-                  Select Stream Server
-                </span>
-                <div className="flex flex-wrap gap-2">
-                  {availableServers.map((slot) => (
-                    <button
-                      key={slot}
-                      onClick={() => setActiveServerId(slot)}
-                      className={`flex-grow sm:flex-grow-0 px-4 py-2.5 text-xs font-bold rounded-xl transition-all duration-150 active:scale-95 cursor-pointer ${activeServerId === slot
-                        ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-500/20"
-                        : "bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/5"
-                        }`}
-                    >
-                      {player.servers[slot]?.name || `Server ${slot}`}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+            <LiveMatchChat playerId={playerId} roomTitle={player.name} />
           </div>
         ) : (
           <div className="aspect-video w-full rounded-2xl bg-black/40 border border-dashed border-white/5 flex flex-col items-center justify-center p-6 text-center select-none text-slate-500">
