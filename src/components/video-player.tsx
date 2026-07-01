@@ -1,9 +1,9 @@
 "use client";
 
-import { MediaPlayer, MediaProvider, Poster, isHLSProvider, useMediaPlayer, useMediaStore, type MediaPlayerInstance, type MediaProviderAdapter } from "@vidstack/react";
+import { MediaPlayer, MediaProvider, isHLSProvider, useMediaPlayer, useMediaStore, type MediaPlayerInstance, type MediaProviderAdapter } from "@vidstack/react";
 import { defaultLayoutIcons, DefaultVideoLayout } from "@vidstack/react/player/layouts/default";
 import { forwardRef, useState, useRef, useImperativeHandle, useEffect } from "react";
-import { MessageSquare, MessageSquareOff, Server, Loader2, Crop, ToggleLeft, ToggleRight } from "lucide-react";
+import { MessageSquare, MessageSquareOff, Server, Loader2, Crop, ToggleLeft, ToggleRight, RefreshCw, AlertTriangle } from "lucide-react";
 import { LiveMatchChat } from "@/components/live-match-chat";
 import { FloatingReactions } from "@/components/floating-reactions";
 import { FloatingChat } from "@/components/floating-chat";
@@ -11,7 +11,6 @@ import { FloatingChat } from "@/components/floating-chat";
 interface VideoPlayerProps {
   src: string;
   title: string;
-  poster?: string;
   thumbnails?: string;
   onPlay?: () => void;
   onPause?: () => void;
@@ -59,7 +58,7 @@ const PIPToggle = () => {
 };
 
 export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
-  ({ src, title, poster, thumbnails, onPlay, onPause, children, muted = false, autoPlay = false, isChatOpen = false, onToggleChat, playerId, isMobile = false, servers = [], activeServerId, onServerChange }, ref) => {
+  ({ src, title, thumbnails, onPlay, onPause, children, muted = false, autoPlay = false, isChatOpen = false, onToggleChat, playerId, isMobile = false, servers = [], activeServerId, onServerChange }, ref) => {
     const [objectFit, setObjectFit] = useState<"contain" | "cover" | "fill">("contain");
     const [isServerMenuOpen, setIsServerMenuOpen] = useState(false);
     const [isFloatingEnabled, setIsFloatingEnabled] = useState(false); // Disabled initially
@@ -82,44 +81,145 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
     // Forward the ref to the parent component
     useImperativeHandle(ref, () => playerRef.current!);
 
-    const { fullscreen, waiting } = useMediaStore(playerRef);
+    const { fullscreen, waiting, error, playing, canPlay } = useMediaStore(playerRef);
     const [autoSwitchingTo, setAutoSwitchingTo] = useState<string | null>(null);
     const [countdown, setCountdown] = useState<number | null>(null);
     const [nextServerName, setNextServerName] = useState<string | null>(null);
+    const [failedServers, setFailedServers] = useState<Set<string>>(new Set());
+    const [retryCount, setRetryCount] = useState(0);
+    const [loadingTimeout, setLoadingTimeout] = useState(false);
+    const [userClickedShowOverlay, setUserClickedShowOverlay] = useState(false);
 
     useEffect(() => {
-      let intervalId: NodeJS.Timeout;
+      if (canPlay) {
+        setLoadingTimeout(false);
+        setUserClickedShowOverlay(false);
+        return;
+      }
 
-      if (waiting) {
-        if (servers.length > 1 && activeServerId && onServerChange) {
+      setLoadingTimeout(false);
+      const timer = setTimeout(() => {
+        setLoadingTimeout(true);
+      }, 2500);
+
+      return () => clearTimeout(timer);
+    }, [canPlay, src]);
+
+    const allStreamsFailed = servers.length > 0 && servers.every((s) => failedServers.has(s.id));
+
+    const handleRefresh = () => {
+      setFailedServers(new Set());
+      setCountdown(null);
+      setNextServerName(null);
+      setAutoSwitchingTo(null);
+      setRetryCount((prev) => prev + 1);
+      if (servers.length > 0 && onServerChange) {
+        onServerChange(servers[0].id);
+      }
+    };
+
+    const finalSrc = src
+      ? src.includes("?")
+        ? `${src}&retry=${retryCount}`
+        : `${src}?retry=${retryCount}`
+      : "";
+
+    // Clear failed servers if playback succeeds
+    useEffect(() => {
+      if ((playing || canPlay) && !waiting && !error) {
+        setFailedServers(new Set());
+      }
+    }, [playing, canPlay, waiting, error]);
+
+    // Handle immediate error states
+    useEffect(() => {
+      if (error && activeServerId && servers.length > 0) {
+        // Mark current server as failed
+        setFailedServers((prev) => {
+          if (prev.has(activeServerId)) return prev;
+          const next = new Set(prev);
+          next.add(activeServerId);
+          return next;
+        });
+
+        // Switch immediately to next server if we have other servers
+        const allFailed = servers.every((s) => s.id === activeServerId || failedServers.has(s.id));
+        if (!allFailed && onServerChange) {
           const currentIdx = servers.findIndex((s) => s.id === activeServerId);
           if (currentIdx !== -1) {
             const nextIdx = (currentIdx + 1) % servers.length;
             const nextServer = servers[nextIdx];
+            setAutoSwitchingTo(nextServer.name);
+            onServerChange(nextServer.id);
+            setTimeout(() => {
+              setAutoSwitchingTo(null);
+            }, 4000);
+          }
+        }
+      }
+    }, [error, activeServerId, servers, onServerChange, failedServers]);
+
+    useEffect(() => {
+      let intervalId: NodeJS.Timeout;
+
+      // Stall can be either playback buffering (waiting) OR loading taking too long
+      const isStalled = (waiting || (!canPlay && loadingTimeout)) && !error;
+
+      if (isStalled && activeServerId && servers.length > 0) {
+        const allFailed = servers.every((s) => failedServers.has(s.id));
+        if (allFailed) {
+          return;
+        }
+
+        const currentIdx = servers.findIndex((s) => s.id === activeServerId);
+        if (currentIdx !== -1) {
+          const hasMultiple = servers.length > 1;
+          const nextIdx = hasMultiple ? (currentIdx + 1) % servers.length : -1;
+          const nextServer = nextIdx !== -1 ? servers[nextIdx] : null;
+
+          if (nextServer) {
             setNextServerName(nextServer.name);
+          }
 
-            let localCountdown = 4;
-            setCountdown(localCountdown);
+          let localCountdown = 5; // Give it 5 seconds to try
+          setCountdown(localCountdown);
 
-            intervalId = setInterval(() => {
-              localCountdown -= 1;
-              if (localCountdown >= 0) {
-                setCountdown(localCountdown);
+          intervalId = setInterval(() => {
+            localCountdown -= 1;
+            if (localCountdown >= 0) {
+              setCountdown(localCountdown);
+            }
+            if (localCountdown === 0) {
+              clearInterval(intervalId);
+
+              // Mark current server as failed
+              setFailedServers((prev) => {
+                const next = new Set(prev);
+                next.add(activeServerId);
+                return next;
+              });
+
+              // Switch if there is a next server and not all servers failed
+              if (nextServer && onServerChange) {
+                const allFailedAfterThis = servers.every(
+                  (s) => s.id === activeServerId || failedServers.has(s.id)
+                );
+                if (!allFailedAfterThis) {
+                  setAutoSwitchingTo(nextServer.name);
+                  onServerChange(nextServer.id);
+                }
               }
-              if (localCountdown === 0) {
-                clearInterval(intervalId);
-                setAutoSwitchingTo(nextServer.name);
-                onServerChange(nextServer.id);
-                setCountdown(null);
-                setNextServerName(null);
 
-                // Auto-dismiss switching HUD after 4 seconds
+              setCountdown(null);
+              setNextServerName(null);
+
+              if (nextServer) {
                 setTimeout(() => {
                   setAutoSwitchingTo(null);
                 }, 4000);
               }
-            }, 1000);
-          }
+            }
+          }, 1000);
         }
       } else {
         setCountdown(null);
@@ -129,7 +229,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
       return () => {
         if (intervalId) clearInterval(intervalId);
       };
-    }, [waiting, servers, activeServerId, onServerChange]);
+    }, [waiting, canPlay, loadingTimeout, error, servers, activeServerId, onServerChange, failedServers]);
 
     const toggleFit = () => {
       setObjectFit((prev) => {
@@ -164,11 +264,18 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
     const showOverlayChat = isChatOpen && (isMobile || fullscreen);
 
     return (
-      <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black/95 border border-white/10 shadow-2xl backdrop-blur-md transition-all duration-300 hover:border-violet-500/30 group">
+      <div 
+        onClick={() => {
+          if (!canPlay) {
+            setUserClickedShowOverlay(true);
+          }
+        }}
+        className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black/95 border border-white/10 shadow-2xl backdrop-blur-md transition-all duration-300 hover:border-violet-500/30 group"
+      >
         <MediaPlayer
           className="w-full h-full select-none outline-none relative"
           title={title}
-          src={src}
+          src={finalSrc}
           crossOrigin="anonymous"
           playsInline
           streamType="live"
@@ -180,15 +287,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
           muted={muted}
           autoPlay={autoPlay}
         >
-          <MediaProvider>
-            {poster && (
-              <Poster
-                src={poster}
-                alt={title}
-                className="absolute inset-0 w-full h-full opacity-0 data-[visible]:opacity-100 transition-opacity duration-500 z-10 pointer-events-none"
-              />
-            )}
-          </MediaProvider>
+          <MediaProvider />
           <DefaultVideoLayout
             thumbnails={thumbnails}
             icons={defaultLayoutIcons}
@@ -329,7 +428,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
           )}
 
           {/* Slow connection overlay warning */}
-          {countdown !== null && countdown <= 4 && (
+          {!allStreamsFailed && countdown !== null && countdown <= 4 && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-30 pointer-events-none select-none animate-in fade-in duration-300">
               <div className="bg-[#0f0f13]/95 backdrop-blur border border-white/10 rounded-2xl p-5 md:p-6 text-center max-w-[340px] shadow-2xl flex flex-col items-center gap-3 pointer-events-auto">
                 <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500 animate-pulse relative mb-1">
@@ -344,7 +443,11 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                 <div className="flex flex-col gap-1.5">
                   <h4 className="text-sm md:text-base font-bold text-slate-200">Slow Connection</h4>
                   <p className="text-xs md:text-sm leading-relaxed text-slate-400">
-                    Stream stalled. Switching to <span className="font-semibold text-violet-400">{nextServerName}</span> in <span className="font-bold text-amber-400">{countdown}s</span>...
+                    {nextServerName ? (
+                      <>Stream stalled. Switching to <span className="font-semibold text-violet-400">{nextServerName}</span> in <span className="font-bold text-amber-400">{countdown}s</span>...</>
+                    ) : (
+                      <>Stream stalled. Retrying stream in <span className="font-bold text-amber-400">{countdown}s</span>...</>
+                    )}
                   </p>
                 </div>
               </div>
@@ -352,7 +455,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
           )}
 
           {/* Auto switching notification */}
-          {autoSwitchingTo && (
+          {!allStreamsFailed && autoSwitchingTo && (
             <div className="absolute top-4 left-4 right-4 sm:left-auto sm:w-[320px] bg-violet-950/90 backdrop-blur border border-violet-500/20 text-white rounded-xl p-4 flex items-center gap-3.5 shadow-2xl z-30 animate-in slide-in-from-top-4 duration-300 pointer-events-auto">
               <div className="w-8 h-8 rounded-full bg-violet-500/20 flex items-center justify-center text-violet-400">
                 <Loader2 className="w-4.5 h-4.5 animate-spin" />
@@ -362,6 +465,100 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                 <p className="text-[11px] md:text-xs text-slate-300 truncate">
                   Stream stalled. Loading {autoSwitchingTo}...
                 </p>
+              </div>
+            </div>
+          )}
+
+          {/* Custom Loading, Error and Servers Overlay */}
+          {!canPlay && (loadingTimeout || error || allStreamsFailed || userClickedShowOverlay) && (
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm z-40 animate-in fade-in duration-300 p-6 text-center select-none pointer-events-auto"
+            >
+              <div className="w-16 h-16 rounded-full bg-violet-500/10 flex items-center justify-center mb-4 animate-pulse">
+                {allStreamsFailed || error ? (
+                  <AlertTriangle className="w-8 h-8 text-rose-500" />
+                ) : (
+                  <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
+                )}
+              </div>
+
+              <h3 className="text-base md:text-lg font-bold text-slate-100 mb-2">
+                {allStreamsFailed
+                  ? "All Streams Offline"
+                  : error
+                  ? "Error Loading Stream"
+                  : countdown !== null
+                  ? `Switching Server in ${countdown}s`
+                  : "Connecting to Stream..."}
+              </h3>
+
+              <p className="text-xs md:text-sm text-slate-400 max-w-sm mb-6 leading-relaxed">
+                {allStreamsFailed
+                  ? "We tried all available stream servers but none of them are responding right now. Please try refreshing or select a different server."
+                  : error
+                  ? "The media player encountered an error loading this source. Please select another server or try refreshing."
+                  : countdown !== null
+                  ? `Stream stalled. Automatically switching to ${nextServerName || "next server"} in ${countdown}s...`
+                  : "The stream is taking longer than usual to load. You can wait a moment, refresh, or switch to an alternative server."}
+              </p>
+
+              {/* Server selector buttons directly inside the overlay */}
+              {servers.length > 0 && (
+                <div className="mb-6 w-full max-w-xs flex flex-col gap-2">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider select-none">
+                    Select Stream Server
+                  </span>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {servers.map((srv) => (
+                      <button
+                        key={srv.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onServerChange) {
+                            onServerChange(srv.id);
+                          }
+                        }}
+                        className={`px-3 py-2 text-xs font-semibold rounded-xl border transition-all duration-200 cursor-pointer ${
+                          activeServerId === srv.id
+                            ? "bg-violet-600 border-violet-500 text-white shadow-lg shadow-violet-600/20"
+                            : "bg-white/5 border-white/10 text-slate-300 hover:text-white hover:bg-white/10"
+                        }`}
+                      >
+                        {srv.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleRefresh}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-500 active:scale-95 text-white text-xs md:text-sm font-semibold rounded-xl transition-all duration-200 shadow-lg shadow-violet-600/20 group cursor-pointer"
+                >
+                  <RefreshCw className="w-4 h-4 transition-transform duration-500 group-hover:rotate-180" />
+                  <span>Refresh Stream</span>
+                </button>
+
+                {onToggleChat && (
+                  <button
+                    onClick={onToggleChat}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-white/5 hover:bg-white/10 active:scale-95 text-slate-200 hover:text-white text-xs md:text-sm font-semibold rounded-xl border border-white/10 transition-all duration-200 cursor-pointer"
+                  >
+                    {isChatOpen ? (
+                      <>
+                        <MessageSquareOff className="w-4 h-4 text-emerald-400" />
+                        <span>Hide Chat</span>
+                      </>
+                    ) : (
+                      <>
+                        <MessageSquare className="w-4 h-4" />
+                        <span>Show Chat</span>
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           )}

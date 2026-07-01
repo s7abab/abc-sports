@@ -79,8 +79,6 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
     fetchPlayer();
   }, [playerId]);
 
-  const poster = "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&q=80&w=1200";
-
   // Filter available servers
   const availableServers = player?.servers
     ? (["1", "2", "3", "4"] as const)
@@ -122,7 +120,6 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
               <VideoPlayer
                 src={currentStreamUrl}
                 title={player.name}
-                poster={poster}
                 autoPlay={true}
                 isChatOpen={isChatOpen}
                 onToggleChat={toggleChat}
