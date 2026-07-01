@@ -83,7 +83,12 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
 
   // Filter available servers
   const availableServers = player?.servers
-    ? (["1", "2", "3", "4"] as const).filter((slot) => player.servers[slot]?.url)
+    ? (["1", "2", "3", "4"] as const)
+        .filter((slot) => player.servers[slot]?.url)
+        .map((slot) => ({
+          id: slot,
+          name: player.servers[slot]?.name || `Server ${slot}`,
+        }))
     : [];
 
   const currentStreamUrl = player && activeServerId ? player.servers[activeServerId]?.url : "";
@@ -123,29 +128,10 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
                 onToggleChat={toggleChat}
                 playerId={playerId}
                 isMobile={isMobile}
+                servers={availableServers}
+                activeServerId={activeServerId}
+                onServerChange={(id) => setActiveServerId(id)}
               />
-
-              {availableServers.length > 1 && (
-                <div className="bg-[#0f0f13] border border-white/5 rounded-2xl p-4 flex flex-col gap-2.5 shadow-xl">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
-                    Select Stream Server
-                  </span>
-                  <div className="flex flex-wrap gap-2">
-                    {availableServers.map((slot) => (
-                      <button
-                        key={slot}
-                        onClick={() => setActiveServerId(slot)}
-                        className={`flex-grow sm:flex-grow-0 px-4 py-2.5 text-xs font-bold rounded-xl transition-all duration-150 active:scale-95 cursor-pointer ${activeServerId === slot
-                          ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-500/20"
-                          : "bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/5"
-                          }`}
-                      >
-                        {player.servers[slot]?.name || `Server ${slot}`}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
 
             {isChatOpen && !isMobile && (
