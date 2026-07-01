@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState, useSyncExternalStore } from "react";
 import { VideoPlayer } from "@/components/video-player";
 import { LiveMatchChat } from "@/components/live-match-chat";
 import { Loader2 } from "lucide-react";
@@ -17,6 +17,18 @@ interface PlayerConfig {
   };
 }
 
+function useIsMobile() {
+  return useSyncExternalStore(
+    (onStoreChange) => {
+      const media = window.matchMedia("(max-width: 1023px)");
+      media.addEventListener("change", onStoreChange);
+      return () => media.removeEventListener("change", onStoreChange);
+    },
+    () => window.matchMedia("(max-width: 1023px)").matches,
+    () => false
+  );
+}
+
 export default function SinglePlayerPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = React.use(params);
   const playerId = resolvedParams.id;
@@ -25,6 +37,10 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
   const [activeServerId, setActiveServerId] = useState<"1" | "2" | "3" | "4" | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isChatOpen, setIsChatOpen] = useState(true);
+  const isMobile = useIsMobile();
+
+  const toggleChat = () => setIsChatOpen((prev) => !prev);
 
   useEffect(() => {
     async function fetchPlayer() {
@@ -92,13 +108,21 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
             <p className="text-sm font-semibold text-rose-400">{error}</p>
           </div>
         ) : player && currentStreamUrl ? (
-          <div className="grid w-full gap-4 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start">
+          <div className={`grid w-full gap-4 items-start transition-all duration-300 ${
+            isChatOpen && !isMobile
+              ? "lg:grid-cols-[minmax(0,1fr)_24rem]"
+              : "grid-cols-1"
+          }`}>
             <div className="flex min-w-0 flex-col gap-4">
               <VideoPlayer
                 src={currentStreamUrl}
                 title={player.name}
                 poster={poster}
                 autoPlay={true}
+                isChatOpen={isChatOpen}
+                onToggleChat={toggleChat}
+                playerId={playerId}
+                isMobile={isMobile}
               />
 
               {availableServers.length > 1 && (
@@ -124,7 +148,9 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
               )}
             </div>
 
-            <LiveMatchChat playerId={playerId} roomTitle={player.name} />
+            {isChatOpen && !isMobile && (
+              <LiveMatchChat playerId={playerId} roomTitle={player.name} />
+            )}
           </div>
         ) : (
           <div className="aspect-video w-full rounded-2xl bg-black/40 border border-dashed border-white/5 flex flex-col items-center justify-center p-6 text-center select-none text-slate-500">
