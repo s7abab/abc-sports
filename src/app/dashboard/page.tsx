@@ -3,11 +3,12 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { VideoPlayer } from "@/components/video-player";
-import { Tv, Sparkles, Loader2, Copy, Check, Settings, Save, ExternalLink, X, Link2 } from "lucide-react";
+import { Tv, Sparkles, Loader2, Copy, Check, Settings, Save, ExternalLink, X } from "lucide-react";
 
 interface PlayerConfig {
   id: string;
   name: string;
+  primaryServer: string;
   servers: {
     "1": { name: string; url: string };
     "2": { name: string; url: string };
@@ -33,6 +34,7 @@ export default function DashboardPage() {
     "3": { name: "", url: "" },
     "4": { name: "", url: "" },
   });
+  const [editingPrimaryServer, setEditingPrimaryServer] = useState<string>("1");
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
@@ -47,6 +49,7 @@ export default function DashboardPage() {
       "4": { name: string; url: string };
     };
   }>({});
+  const [bulkPrimaryServers, setBulkPrimaryServers] = useState<{ [key: string]: string }>({});
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -91,6 +94,7 @@ export default function DashboardPage() {
       "3": { name: player.servers?.["3"]?.name || "", url: player.servers?.["3"]?.url || "" },
       "4": { name: player.servers?.["4"]?.name || "", url: player.servers?.["4"]?.url || "" },
     });
+    setEditingPrimaryServer(player.primaryServer || "1");
     setSaveError("");
   };
 
@@ -103,6 +107,8 @@ export default function DashboardPage() {
         "4": { name: string; url: string };
       };
     } = {};
+    const primaryServers: { [key: string]: string } = {};
+
     players.forEach((p) => {
       urls[p.id] = {
         "1": { name: p.servers?.["1"]?.name || "", url: p.servers?.["1"]?.url || "" },
@@ -110,8 +116,10 @@ export default function DashboardPage() {
         "3": { name: p.servers?.["3"]?.name || "", url: p.servers?.["3"]?.url || "" },
         "4": { name: p.servers?.["4"]?.name || "", url: p.servers?.["4"]?.url || "" },
       };
+      primaryServers[p.id] = p.primaryServer || "1";
     });
     setBulkInputUrls(urls);
+    setBulkPrimaryServers(primaryServers);
     setSaveError("");
     if (players.length > 0) {
       setActiveBulkTab(players[0].id);
@@ -164,7 +172,7 @@ export default function DashboardPage() {
 
     try {
       const updatedPlayers = players.map((p) =>
-        p.id === editingPlayer.id ? { ...p, servers: inputUrls } : p
+        p.id === editingPlayer.id ? { ...p, servers: inputUrls, primaryServer: editingPrimaryServer } : p
       );
 
       const response = await fetch("/api/players", {
@@ -213,6 +221,13 @@ export default function DashboardPage() {
     }));
   };
 
+  const handleBulkPrimaryServerChange = (playerId: string, slot: string) => {
+    setBulkPrimaryServers((prev) => ({
+      ...prev,
+      [playerId]: slot,
+    }));
+  };
+
   const handleSaveBulk = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
@@ -244,6 +259,7 @@ export default function DashboardPage() {
       const updatedPlayers = players.map((p) => ({
         ...p,
         servers: bulkInputUrls[p.id] || p.servers,
+        primaryServer: bulkPrimaryServers[p.id] || p.primaryServer,
       }));
 
       const response = await fetch("/api/players", {
@@ -266,8 +282,36 @@ export default function DashboardPage() {
     }
   };
 
+  const handleHotSwapPrimaryServer = async (playerId: string, slot: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Avoid triggering details card navigation
+    const target = players.find((p) => p.id === playerId);
+    if (!target || target.primaryServer === slot) return;
+
+    try {
+      const updatedPlayers = players.map((p) =>
+        p.id === playerId ? { ...p, primaryServer: slot } : p
+      );
+
+      const response = await fetch("/api/players", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedPlayers),
+      });
+
+      if (response.ok) {
+        setPlayers(updatedPlayers);
+      }
+    } catch (err) {
+      console.error("Error hot-swapping primary server:", err);
+    }
+  };
+
   const getActiveStreamUrl = (player: PlayerConfig): string => {
     if (!player.servers) return "";
+    const primary = player.primaryServer || "1";
+    if (player.servers[primary as "1" | "2" | "3" | "4"]?.url) {
+      return player.servers[primary as "1" | "2" | "3" | "4"].url;
+    }
     return player.servers["1"]?.url || player.servers["2"]?.url || player.servers["3"]?.url || player.servers["4"]?.url || "";
   };
 
@@ -341,6 +385,32 @@ export default function DashboardPage() {
                   </Link>
 
                   <div className="flex items-center gap-2">
+                    {/* Server Hot-Swap Switcher Pill Selector */}
+                    {Object.keys(player.servers || {}).some((slot) => player.servers[slot as "1" | "2" | "3" | "4"]?.url) && (
+                      <div className="flex items-center gap-0.5 bg-white/[0.02] border border-white/5 px-1 py-0.5 rounded-md mr-1 select-none">
+                        {(["1", "2", "3", "4"] as const).map((slot) => {
+                          const hasUrl = !!player.servers[slot]?.url;
+                          const isPrimary = (player.primaryServer || "1") === slot;
+                          if (!hasUrl) return null;
+                          return (
+                            <button
+                              key={slot}
+                              type="button"
+                              onClick={(e) => handleHotSwapPrimaryServer(player.id, slot, e)}
+                              className={`text-[8px] font-extrabold w-4 h-4 flex items-center justify-center rounded transition-all active:scale-90 cursor-pointer ${
+                                isPrimary
+                                  ? "bg-violet-600 text-white shadow shadow-violet-500/30 font-extrabold"
+                                  : "text-slate-500 hover:text-slate-300 hover:bg-white/5"
+                              }`}
+                              title={`Set ${player.servers[slot]?.name || `Server ${slot}`} as default feed`}
+                            >
+                              S{slot}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
                     {/* Copy Link Button */}
                     <button
                       type="button"
@@ -420,7 +490,7 @@ export default function DashboardPage() {
         <div className="flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-500 px-1 py-4 border-t border-white/5 gap-2 mt-auto">
           <p className="flex items-center gap-1.5">
             <Sparkles className="h-3.5 w-3.5 text-violet-400" />
-            Click on a feed title to watch that single channel. Click "Configure" to update stream sources.
+            Click S1-S4 to hot-swap active feeds. Click "Configure" to update stream sources.
           </p>
           <p>Powered by Vidstack & Next.js</p>
         </div>
@@ -454,11 +524,24 @@ export default function DashboardPage() {
                   <div key={slot} className="bg-black/40 border border-white/5 rounded-xl p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-bold text-violet-400">Server Slot {slot}</span>
-                      {inputUrls[slot].url && (
-                        <span className="text-[8px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                          Active
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setEditingPrimaryServer(slot)}
+                          className={`px-2 py-0.5 rounded text-[8px] font-bold transition-all border cursor-pointer ${
+                            editingPrimaryServer === slot
+                              ? "bg-violet-600 border-violet-500 text-white"
+                              : "border-white/10 hover:border-white/20 text-slate-450 text-slate-400 hover:text-white"
+                          }`}
+                        >
+                          {editingPrimaryServer === slot ? "★ Primary Feed" : "Set Primary"}
+                        </button>
+                        {inputUrls[slot].url && (
+                          <span className="text-[8px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            Active
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div className="sm:col-span-1">
@@ -567,11 +650,24 @@ export default function DashboardPage() {
                   <div key={slot} className="bg-black/40 border border-white/5 rounded-xl p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-bold text-violet-400">Server Slot {slot}</span>
-                      {bulkInputUrls[activeBulkTab]?.[slot]?.url && (
-                        <span className="text-[8px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                          Active
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleBulkPrimaryServerChange(activeBulkTab, slot)}
+                          className={`px-2 py-0.5 rounded text-[8px] font-bold transition-all border cursor-pointer ${
+                            (bulkPrimaryServers[activeBulkTab] || "1") === slot
+                              ? "bg-violet-600 border-violet-500 text-white"
+                              : "border-white/10 hover:border-white/20 text-slate-450 text-slate-400 hover:text-white"
+                          }`}
+                        >
+                          {(bulkPrimaryServers[activeBulkTab] || "1") === slot ? "★ Primary Feed" : "Set Primary"}
+                        </button>
+                        {bulkInputUrls[activeBulkTab]?.[slot]?.url && (
+                          <span className="text-[8px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            Active
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div className="sm:col-span-1">
