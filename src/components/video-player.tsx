@@ -339,7 +339,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                 : "w-full h-full"
             }`}>
               {/* Watermark aligned to the top right of the video bounds */}
-              <div className="absolute top-[3.5%] right-[2.5%] pointer-events-none">
+              <div className="absolute top-[1%] right-[1.5%] pointer-events-none">
                 <div className="flex items-center gap-[clamp(4px,0.5vw,8px)] px-[clamp(10px,1.2vw,16px)] py-[clamp(5px,0.8vw,10px)] rounded-[clamp(6px,0.8vw,10px)] bg-slate-950/95 backdrop-blur-md border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.55)] transition-all duration-300 hover:border-violet-500/30">
                   {/* Brand Logo Mark */}
                   <div className="w-[clamp(14px,1.5vw,18px)] h-[clamp(14px,1.5vw,18px)] rounded-full bg-gradient-to-tr from-violet-600 to-fuchsia-600 flex items-center justify-center text-[clamp(8px,1vw,10px)] font-black text-white shrink-0 shadow-sm tracking-tighter select-none">
