@@ -92,3 +92,20 @@ media-player[data-fit="cover"] media-poster img,
 [data-fit="cover"] media-poster img {
   object-fit: cover !important;
 }
+
+/* Keep Vidstack's small-screen control bar inside the rounded player frame. */
+@media (max-width: 640px), (pointer: coarse) {
+  .vds-video-layout[data-sm] .vds-controls {
+    padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+  }
+
+  .vds-video-layout[data-sm] .vds-controls-group:last-child {
+    margin-bottom: 0 !important;
+    padding-bottom: 6px !important;
+  }
+
+  .vds-video-layout[data-sm] .vds-controls .vds-button {
+    min-width: 36px;
+    min-height: 36px;
+  }
+}
