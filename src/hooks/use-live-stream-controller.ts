@@ -364,8 +364,7 @@ export function useLiveStreamController({
       const stalled =
         Boolean(error) ||
         (waiting && canPlay && bufferAhead < STREAM_HEALTH_TARGETS.minimumPlayableBuffer) ||
-        (!canPlay && startupAge > STREAM_HEALTH_TARGETS.startupGraceMs) ||
-        (canPlay && bufferAhead < STREAM_HEALTH_TARGETS.degradedBufferThreshold);
+        (!canPlay && startupAge > STREAM_HEALTH_TARGETS.startupGraceMs);
 
       if (!activeServerId) {
         setPhase("starting");
