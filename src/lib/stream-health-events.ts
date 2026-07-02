@@ -1,5 +1,3 @@
-import { createOpenRouterChatCompletion, isAiEnabled } from "@/lib/openrouter";
-
 export type StreamHealthEventType = "server_failed" | "server_switch" | "stream_recovered";
 
 export interface StreamHealthEvent {
@@ -26,7 +24,6 @@ export interface StreamHealthAlert {
 const MAX_EVENTS = 300;
 const events: StreamHealthEvent[] = [];
 const lastEventByKey = new Map<string, number>();
-let cachedSummary: { createdAt: number; text: string } | null = null;
 
 export function addStreamHealthEvent(input: Omit<StreamHealthEvent, "id" | "createdAt">) {
   const key = [
@@ -59,7 +56,6 @@ export function addStreamHealthEvent(input: Omit<StreamHealthEvent, "id" | "crea
 
   events.unshift(event);
   events.splice(MAX_EVENTS);
-  cachedSummary = null;
   return event;
 }
 
@@ -104,38 +100,7 @@ export async function summarizeStreamHealth() {
     return "No stream health events have been reported yet.";
   }
 
-  if (cachedSummary && Date.now() - cachedSummary.createdAt < 60_000) {
-    return cachedSummary.text;
-  }
-
-  const fallback = alerts.length > 0
+  return alerts.length > 0
     ? alerts.map((alert) => `${alert.title}: ${alert.message}`).join(" ")
     : "Streams are currently stable based on recent player health reports.";
-
-  if (!isAiEnabled()) {
-    return fallback;
-  }
-
-  try {
-    const text = await createOpenRouterChatCompletion({
-      maxTokens: 140,
-      temperature: 0.2,
-      messages: [
-        {
-          role: "system",
-          content:
-            "You summarize live sports stream health for an admin. Be concise. Mention unstable servers, switches, and what to check next. No markdown.",
-        },
-        {
-          role: "user",
-          content: JSON.stringify({ events: recent, alerts }),
-        },
-      ],
-    });
-
-    cachedSummary = { createdAt: Date.now(), text: text || fallback };
-    return cachedSummary.text;
-  } catch {
-    return fallback;
-  }
 }

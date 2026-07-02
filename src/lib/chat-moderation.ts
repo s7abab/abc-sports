@@ -1,9 +1,7 @@
-import { createOpenRouterChatCompletion, isAiEnabled, parseJsonObject } from "@/lib/openrouter";
-
 export interface ChatModerationResult {
   allowed: boolean;
   reason: string;
-  category: "ok" | "spam" | "abuse" | "link" | "unsafe";
+  category: "ok" | "spam" | "abuse" | "link";
 }
 
 const BLOCKED_WORDS = [
@@ -84,7 +82,6 @@ function heuristicModerate(body: string): ChatModerationResult {
 }
 
 export async function moderateChatMessage(input: {
-  author: string;
   body: string;
   kind: "message" | "reaction";
 }): Promise<ChatModerationResult> {
@@ -92,30 +89,5 @@ export async function moderateChatMessage(input: {
     return { allowed: true, reason: "Reactions are allowlisted.", category: "ok" };
   }
 
-  const heuristic = heuristicModerate(input.body);
-  if (!heuristic.allowed || !isAiEnabled()) {
-    return heuristic;
-  }
-
-  try {
-    const content = await createOpenRouterChatCompletion({
-      maxTokens: 120,
-      temperature: 0,
-      messages: [
-        {
-          role: "system",
-          content:
-            "Moderate a sports live chat message. Return only JSON: {\"allowed\":boolean,\"category\":\"ok|spam|abuse|link|unsafe\",\"reason\":\"short user-safe reason\"}. Block hate, harassment, sexual content, threats, scams, spam, and external links. Allow normal football banter.",
-        },
-        {
-          role: "user",
-          content: JSON.stringify({ author: input.author, body: input.body }),
-        },
-      ],
-    });
-
-    return parseJsonObject<ChatModerationResult>(content, heuristic);
-  } catch {
-    return heuristic;
-  }
+  return heuristicModerate(input.body);
 }

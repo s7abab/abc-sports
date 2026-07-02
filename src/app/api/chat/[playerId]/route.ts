@@ -69,7 +69,6 @@ export async function POST(request: Request, context: { params: Promise<{ player
     }
 
     const moderation = await moderateChatMessage({
-      author: typeof payload.author === "string" ? payload.author : "Fan",
       body: typeof payload.body === "string" ? payload.body : "",
       kind,
     });

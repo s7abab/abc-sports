@@ -136,57 +136,8 @@ function heuristicModerateChat(input) {
   return { allowed: true, reason: "Passed local moderation.", category: "ok" };
 }
 
-function parseJsonObject(value, fallback) {
-  try {
-    const match = value.match(/\{[\s\S]*\}/);
-    return JSON.parse(match?.[0] || value);
-  } catch {
-    return fallback;
-  }
-}
-
 async function moderateChatMessage(input) {
-  const heuristic = heuristicModerateChat(input);
-  if (!heuristic.allowed || !process.env.OPENROUTER_API_KEY) {
-    return heuristic;
-  }
-
-  try {
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
-        "X-Title": "ABC Sports",
-      },
-      body: JSON.stringify({
-        model: process.env.OPENROUTER_MODEL || "google/gemini-2.5-flash",
-        temperature: 0,
-        max_tokens: 120,
-        messages: [
-          {
-            role: "system",
-            content:
-              "Moderate a sports live chat message. Return only JSON: {\"allowed\":boolean,\"category\":\"ok|spam|abuse|link|unsafe\",\"reason\":\"short user-safe reason\"}. Block hate, harassment, sexual content, threats, scams, spam, and external links. Allow normal football banter.",
-          },
-          {
-            role: "user",
-            content: JSON.stringify({
-              author: normalizeAuthor(input.author),
-              body: normalizeBody(input.body),
-            }),
-          },
-        ],
-      }),
-    });
-
-    if (!response.ok) return heuristic;
-    const data = await response.json();
-    return parseJsonObject(data?.choices?.[0]?.message?.content || "", heuristic);
-  } catch {
-    return heuristic;
-  }
+  return heuristicModerateChat(input);
 }
 
 async function pruneRoom(playerId) {
