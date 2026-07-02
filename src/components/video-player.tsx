@@ -377,21 +377,24 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
           {/* Slow connection overlay warning */}
           {!allStreamsFailed && countdown !== null && countdown <= 4 && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-30 pointer-events-none select-none animate-in fade-in duration-300">
-              <div className="bg-[#0f0f13]/95 backdrop-blur border border-white/10 rounded-2xl p-5 md:p-6 text-center max-w-[340px] shadow-2xl flex flex-col items-center gap-3 pointer-events-auto">
-                <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500 animate-pulse relative mb-1">
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <div className="mx-3 w-[min(92vw,340px)] bg-[#0f0f13]/95 backdrop-blur border border-white/10 rounded-2xl p-4 sm:p-5 md:p-6 text-center shadow-2xl flex flex-col items-center gap-2.5 sm:gap-3 pointer-events-auto">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500 animate-pulse relative mb-0.5 sm:mb-1">
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
                   </svg>
                   {/* Countdown number badge inside the alert */}
-                  <span className="absolute -top-1 -right-1 bg-amber-500 text-[#0f0f13] text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border border-[#0f0f13] shadow-md">
+                  <span className="absolute -top-1 -right-1 bg-amber-500 text-[#0f0f13] text-[9px] sm:text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border border-[#0f0f13] shadow-md">
                     {countdown}
                   </span>
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <h4 className="text-sm md:text-base font-bold text-slate-200">Slow Connection</h4>
-                  <p className="text-xs md:text-sm leading-relaxed text-slate-400">
+                  <h4 className="text-xs sm:text-sm md:text-base font-bold text-slate-200">Slow Connection</h4>
+                  <p className="text-[11px] sm:text-xs md:text-sm leading-relaxed text-slate-400 text-balance">
                     {nextServerName ? (
-                      <>Building buffer. Switching to <span className="font-semibold text-violet-400">{nextServerName}</span> in <span className="font-bold text-amber-400">{countdown}s</span> if needed...</>
+                      <>
+                        <span className="sm:hidden">Switching to <span className="font-semibold text-violet-400 break-words">{nextServerName}</span> in <span className="font-bold text-amber-400">{countdown}s</span> if needed.</span>
+                        <span className="hidden sm:inline">Building buffer. Switching to <span className="font-semibold text-violet-400 break-words">{nextServerName}</span> in <span className="font-bold text-amber-400">{countdown}s</span> if needed...</span>
+                      </>
                     ) : (
                       <>Recovering stream in <span className="font-bold text-amber-400">{countdown}s</span>...</>
                     )}
@@ -403,14 +406,14 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
 
           {/* Auto switching notification */}
           {!allStreamsFailed && autoSwitchingTo && (
-            <div className="absolute top-4 left-4 right-4 sm:left-auto sm:w-[320px] bg-violet-950/90 backdrop-blur border border-violet-500/20 text-white rounded-xl p-4 flex items-center gap-3.5 shadow-2xl z-30 animate-in slide-in-from-top-4 duration-300 pointer-events-auto">
-              <div className="w-8 h-8 rounded-full bg-violet-500/20 flex items-center justify-center text-violet-400">
-                <Loader2 className="w-4.5 h-4.5 animate-spin" />
+            <div className="absolute top-3 left-3 right-3 sm:top-4 sm:left-auto sm:right-4 sm:w-[320px] bg-violet-950/90 backdrop-blur border border-violet-500/20 text-white rounded-xl p-3 sm:p-4 flex items-center gap-3 sm:gap-3.5 shadow-2xl z-30 animate-in slide-in-from-top-4 duration-300 pointer-events-auto">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-violet-500/20 flex items-center justify-center text-violet-400 shrink-0">
+                <Loader2 className="w-4 h-4 sm:w-4.5 sm:h-4.5 animate-spin" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs md:text-sm font-bold">Switching Server</p>
-                <p className="text-[11px] md:text-xs text-slate-300 truncate">
-                  Stream stalled. Loading {autoSwitchingTo}...
+                <p className="text-[11px] sm:text-xs md:text-sm font-bold">Switching Server</p>
+                <p className="text-[10px] sm:text-[11px] md:text-xs text-slate-300 truncate">
+                  Loading {autoSwitchingTo}...
                 </p>
               </div>
             </div>
@@ -420,33 +423,42 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
           {!canPlay && (loadingTimeout || error || allStreamsFailed || userClickedShowOverlay) && (
             <div 
               onClick={(e) => e.stopPropagation()}
-              className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm z-40 animate-in fade-in duration-300 p-6 text-center select-none pointer-events-auto"
+              className="absolute inset-0 flex flex-col items-center justify-start sm:justify-center bg-black/90 backdrop-blur-sm z-40 animate-in fade-in duration-300 px-3 py-2.5 sm:p-6 text-center select-none pointer-events-auto overflow-y-auto"
             >
-              <div className="w-16 h-16 rounded-full bg-violet-500/10 flex items-center justify-center mb-4 animate-pulse">
-                {allStreamsFailed || error ? (
-                  <AlertTriangle className="w-8 h-8 text-rose-500" />
-                ) : (
-                  <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
-                )}
+              <div className="w-full max-w-[92vw] sm:max-w-sm shrink-0">
+                <div className="mx-auto w-9 h-9 sm:w-16 sm:h-16 rounded-full bg-violet-500/10 flex items-center justify-center mb-1.5 sm:mb-4 animate-pulse">
+                  {allStreamsFailed || error ? (
+                    <AlertTriangle className="w-5 h-5 sm:w-8 sm:h-8 text-rose-500" />
+                  ) : (
+                    <Loader2 className="w-5 h-5 sm:w-8 sm:h-8 text-violet-400 animate-spin" />
+                  )}
+                </div>
+
+                <h3 className="text-[13px] sm:text-base md:text-lg font-bold text-slate-100 mb-1 sm:mb-2 text-balance leading-tight">
+                  {countdown !== null && !allStreamsFailed
+                    ? `${statusTitle} (${countdown}s)`
+                    : statusTitle}
+                </h3>
+
+                <p className="text-[10px] sm:text-xs md:text-sm text-slate-400 mb-2.5 sm:mb-6 leading-snug sm:leading-relaxed text-balance">
+                  <span className="sm:hidden">
+                    {allStreamsFailed
+                      ? "All servers unavailable. Refresh or choose one."
+                      : countdown !== null && nextServerName
+                      ? `Switching to ${nextServerName} in ${countdown}s if needed.`
+                      : "Building buffer. Wait, refresh, or switch server."}
+                  </span>
+                  <span className="hidden sm:inline">{statusMessage}</span>
+                </p>
               </div>
-
-              <h3 className="text-base md:text-lg font-bold text-slate-100 mb-2">
-                {countdown !== null && !allStreamsFailed
-                  ? `${statusTitle} (${countdown}s)`
-                  : statusTitle}
-              </h3>
-
-              <p className="text-xs md:text-sm text-slate-400 max-w-sm mb-6 leading-relaxed">
-                {statusMessage}
-              </p>
 
               {/* Server selector buttons directly inside the overlay */}
               {servers.length > 0 && (
-                <div className="mb-6 w-full max-w-xs flex flex-col gap-2">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider select-none">
+                <div className="mb-2.5 sm:mb-6 w-full max-w-xs flex flex-col gap-1.5 sm:gap-2 shrink-0">
+                  <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider select-none">
                     Select Stream Server
                   </span>
-                  <div className="flex flex-wrap gap-2 justify-center">
+                  <div className="flex flex-wrap gap-1.5 sm:gap-2 justify-center">
                     {servers.map((srv) => (
                       <button
                         key={srv.id}
@@ -454,7 +466,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                           e.stopPropagation();
                           handleManualServerChange(srv.id);
                         }}
-                        className={`px-3 py-2 text-xs font-semibold rounded-xl border transition-all duration-200 cursor-pointer ${
+                        className={`px-2.5 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs font-semibold rounded-lg sm:rounded-xl border transition-all duration-200 cursor-pointer max-w-[8rem] truncate ${
                           activeServerId === srv.id
                             ? "bg-violet-600 border-violet-500 text-white shadow-lg shadow-violet-600/20"
                             : failedServerIds.has(srv.id)
@@ -469,29 +481,29 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                 </div>
               )}
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-row sm:flex-row items-center justify-center gap-2 sm:gap-3 w-full sm:w-auto shrink-0">
                 <button
                   onClick={handleRefresh}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-500 active:scale-95 text-white text-xs md:text-sm font-semibold rounded-xl transition-all duration-200 shadow-lg shadow-violet-600/20 group cursor-pointer"
+                  className="flex min-w-0 flex-1 sm:flex-none sm:w-auto items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-violet-600 hover:bg-violet-500 active:scale-95 text-white text-[10px] sm:text-xs md:text-sm font-semibold rounded-lg sm:rounded-xl transition-all duration-200 shadow-lg shadow-violet-600/20 group cursor-pointer"
                 >
-                  <RefreshCw className="w-4 h-4 transition-transform duration-500 group-hover:rotate-180" />
-                  <span>Refresh Stream</span>
+                  <RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-500 group-hover:rotate-180" />
+                  <span className="truncate">Refresh</span>
                 </button>
 
                 {onToggleChat && (
                   <button
                     onClick={onToggleChat}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-white/5 hover:bg-white/10 active:scale-95 text-slate-200 hover:text-white text-xs md:text-sm font-semibold rounded-xl border border-white/10 transition-all duration-200 cursor-pointer"
+                    className="flex min-w-0 flex-1 sm:flex-none sm:w-auto items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-white/5 hover:bg-white/10 active:scale-95 text-slate-200 hover:text-white text-[10px] sm:text-xs md:text-sm font-semibold rounded-lg sm:rounded-xl border border-white/10 transition-all duration-200 cursor-pointer"
                   >
                     {isChatOpen ? (
                       <>
-                        <MessageSquareOff className="w-4 h-4 text-emerald-400" />
-                        <span>Hide Chat</span>
+                        <MessageSquareOff className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />
+                        <span className="truncate">Hide Chat</span>
                       </>
                     ) : (
                       <>
-                        <MessageSquare className="w-4 h-4" />
-                        <span>Show Chat</span>
+                        <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <span className="truncate">Chat</span>
                       </>
                     )}
                   </button>
