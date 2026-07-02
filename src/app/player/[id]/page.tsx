@@ -4,7 +4,7 @@ import React, { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { VideoPlayer } from "@/components/video-player";
 import { LiveMatchChat } from "@/components/live-match-chat";
-import { Loader2, MessageSquare, Server } from "lucide-react";
+import { Loader2, Server } from "lucide-react";
 
 interface PlayerConfig {
   id: string;
@@ -43,27 +43,10 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
 
     return localStorage.getItem("auto_switch_server_enabled") !== "false";
   });
-  const [isFloatingEnabled, setIsFloatingEnabled] = useState<boolean>(() => {
-    if (typeof window === "undefined") {
-      return false;
-    }
-
-    return localStorage.getItem("live_chat_float_enabled") === "true";
-  });
-
   const toggleAutoSwitch = () => {
     const next = !isAutoSwitchEnabled;
     setIsAutoSwitchEnabled(next);
     localStorage.setItem("auto_switch_server_enabled", String(next));
-  };
-
-  const toggleFloating = () => {
-    const next = !isFloatingEnabled;
-    setIsFloatingEnabled(next);
-    localStorage.setItem("live_chat_float_enabled", String(next));
-    window.dispatchEvent(
-      new CustomEvent("live-chat-float-toggled", { detail: { enabled: next } })
-    );
   };
 
   const toggleChat = () => setIsChatOpen((prev) => !prev);
@@ -195,7 +178,6 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
                   activeServerId={activeServerId}
                   onServerChange={(id) => setActiveServerId(id)}
                   isAutoSwitchEnabled={isAutoSwitchEnabled}
-                  isFloatingEnabled={isFloatingEnabled}
                 />
               </div>
 
@@ -241,36 +223,31 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
               {/* Divider on desktop */}
               <div className="hidden sm:block h-4 w-px bg-white/10" />
 
-              {/* Show Floating Chat Switch */}
-              <button
-                type="button"
-                onClick={toggleFloating}
-                className="flex items-center justify-between gap-5 w-full sm:w-auto text-left cursor-pointer group focus:outline-none select-none hover:bg-white/[0.04] active:scale-[0.98] px-3 py-1.5 rounded-lg transition-all duration-200 border border-transparent hover:border-white/5"
-                aria-label="Toggle floating chat"
-              >
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform duration-200" />
+              <div className="flex min-w-0 w-full sm:w-auto flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+                <div className="flex items-center gap-2 px-3 sm:px-0">
+                  <Server className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                   <span className="text-xs font-bold text-slate-200">
-                    Floating Chat
+                    Servers
                   </span>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className={`text-[9px] font-bold tracking-wider uppercase transition-colors duration-200 ${isFloatingEnabled ? "text-emerald-400" : "text-slate-500"}`}>
-                    {isFloatingEnabled ? "ON" : "OFF"}
-                  </span>
-                  <div
-                    className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border border-transparent transition-colors duration-200 ease-in-out ${
-                      isFloatingEnabled ? "bg-emerald-600" : "bg-slate-800"
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${
-                        isFloatingEnabled ? "translate-x-4" : "translate-x-0"
+                <div className="flex min-w-0 flex-wrap gap-1.5 px-3 sm:px-0">
+                  {availableServers.map((server) => (
+                    <button
+                      key={server.id}
+                      type="button"
+                      onClick={() => setActiveServerId(server.id)}
+                      className={`min-h-8 max-w-[9rem] rounded-lg border px-2.5 text-[10px] font-bold transition-all duration-200 active:scale-95 ${
+                        activeServerId === server.id
+                          ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300"
+                          : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white"
                       }`}
-                    />
-                  </div>
+                      aria-pressed={activeServerId === server.id}
+                    >
+                      <span className="block truncate">{server.name}</span>
+                    </button>
+                  ))}
                 </div>
-              </button>
+              </div>
             </div>
 
             {/* Bottom Chat: visible when the overlay/side chat is closed */}
