@@ -38,10 +38,10 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
   const isMobile = useIsMobile();
   const [isAutoSwitchEnabled, setIsAutoSwitchEnabled] = useState<boolean>(() => {
     if (typeof window === "undefined") {
-      return false;
+      return true;
     }
 
-    return localStorage.getItem("auto_switch_server_enabled") === "true";
+    return localStorage.getItem("auto_switch_server_enabled") !== "false";
   });
   const [isFloatingEnabled, setIsFloatingEnabled] = useState<boolean>(() => {
     if (typeof window === "undefined") {
