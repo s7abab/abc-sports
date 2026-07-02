@@ -12,16 +12,79 @@ import {
 } from "@/lib/match-utils";
 import { Tv, Sparkles, Loader2, Copy, Check, Settings, Save, ExternalLink, X, Plus, CalendarPlus, Pencil, Trash2, RotateCcw } from "lucide-react";
 
+interface PlayerServer {
+  name: string;
+  url: string;
+}
+
+type PlayerServers = Record<string, PlayerServer>;
+
 interface PlayerConfig {
   id: string;
   name: string;
   primaryServer: string;
-  servers: {
-    "1": { name: string; url: string };
-    "2": { name: string; url: string };
-    "3": { name: string; url: string };
-    "4": { name: string; url: string };
-  };
+  servers: PlayerServers;
+}
+
+const DEFAULT_SERVER_SLOT_COUNT = 4;
+
+function createEmptyServer(): PlayerServer {
+  return { name: "", url: "" };
+}
+
+function sortServerIds(servers: PlayerServers) {
+  return Object.keys(servers).sort((a, b) => {
+    const aNum = Number(a);
+    const bNum = Number(b);
+    if (Number.isFinite(aNum) && Number.isFinite(bNum)) return aNum - bNum;
+    return a.localeCompare(b, undefined, { numeric: true });
+  });
+}
+
+function createEditableServers(servers?: PlayerServers): PlayerServers {
+  const editable: PlayerServers = {};
+
+  for (let index = 1; index <= DEFAULT_SERVER_SLOT_COUNT; index += 1) {
+    editable[String(index)] = createEmptyServer();
+  }
+
+  Object.entries(servers ?? {}).forEach(([slot, server]) => {
+    editable[slot] = {
+      name: server?.name ?? "",
+      url: server?.url ?? "",
+    };
+  });
+
+  return editable;
+}
+
+function cleanServersForSave(servers: PlayerServers): PlayerServers {
+  const cleaned = Object.entries(servers).reduce<PlayerServers>((acc, [slot, server]) => {
+    const name = server.name.trim();
+    const url = server.url.trim();
+    if (!name && !url) return acc;
+
+    acc[slot] = {
+      name,
+      url,
+    };
+    return acc;
+  }, {});
+
+  return Object.keys(cleaned).length > 0 ? cleaned : createEditableServers();
+}
+
+function getNextServerSlot(servers: PlayerServers) {
+  const numericSlots = Object.keys(servers)
+    .map((slot) => Number(slot))
+    .filter((slot) => Number.isFinite(slot));
+
+  return String(numericSlots.length > 0 ? Math.max(...numericSlots) + 1 : Object.keys(servers).length + 1);
+}
+
+function getPrimaryServerId(servers: PlayerServers, preferred?: string) {
+  if (preferred && servers[preferred]?.url) return preferred;
+  return sortServerIds(servers).find((slot) => servers[slot]?.url) ?? sortServerIds(servers)[0] ?? "1";
 }
 
 export default function DashboardPage() {
@@ -52,17 +115,7 @@ export default function DashboardPage() {
 
   // Single Player Configuration Modal State
   const [editingPlayer, setEditingPlayer] = useState<PlayerConfig | null>(null);
-  const [inputUrls, setInputUrls] = useState<{
-    "1": { name: string; url: string };
-    "2": { name: string; url: string };
-    "3": { name: string; url: string };
-    "4": { name: string; url: string };
-  }>({
-    "1": { name: "", url: "" },
-    "2": { name: "", url: "" },
-    "3": { name: "", url: "" },
-    "4": { name: "", url: "" },
-  });
+  const [inputUrls, setInputUrls] = useState<PlayerServers>(createEditableServers());
   const [editingPrimaryServer, setEditingPrimaryServer] = useState<string>("1");
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -70,14 +123,7 @@ export default function DashboardPage() {
   // Bulk Configuration Modal State
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
   const [activeBulkTab, setActiveBulkTab] = useState<string>("1");
-  const [bulkInputUrls, setBulkInputUrls] = useState<{
-    [key: string]: {
-      "1": { name: string; url: string };
-      "2": { name: string; url: string };
-      "3": { name: string; url: string };
-      "4": { name: string; url: string };
-    };
-  }>({});
+  const [bulkInputUrls, setBulkInputUrls] = useState<Record<string, PlayerServers>>({});
   const [bulkPrimaryServers, setBulkPrimaryServers] = useState<{ [key: string]: string }>({});
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -209,35 +255,19 @@ export default function DashboardPage() {
   const handleOpenSingleEdit = (player: PlayerConfig, e: React.MouseEvent) => {
     e.stopPropagation(); // Avoid triggering details card navigation
     setEditingPlayer(player);
-    setInputUrls({
-      "1": { name: player.servers?.["1"]?.name || "", url: player.servers?.["1"]?.url || "" },
-      "2": { name: player.servers?.["2"]?.name || "", url: player.servers?.["2"]?.url || "" },
-      "3": { name: player.servers?.["3"]?.name || "", url: player.servers?.["3"]?.url || "" },
-      "4": { name: player.servers?.["4"]?.name || "", url: player.servers?.["4"]?.url || "" },
-    });
-    setEditingPrimaryServer(player.primaryServer || "1");
+    const editableServers = createEditableServers(player.servers);
+    setInputUrls(editableServers);
+    setEditingPrimaryServer(getPrimaryServerId(editableServers, player.primaryServer));
     setSaveError("");
   };
 
   const handleOpenBulkEdit = () => {
-    const urls: {
-      [key: string]: {
-        "1": { name: string; url: string };
-        "2": { name: string; url: string };
-        "3": { name: string; url: string };
-        "4": { name: string; url: string };
-      };
-    } = {};
+    const urls: Record<string, PlayerServers> = {};
     const primaryServers: { [key: string]: string } = {};
 
     players.forEach((p) => {
-      urls[p.id] = {
-        "1": { name: p.servers?.["1"]?.name || "", url: p.servers?.["1"]?.url || "" },
-        "2": { name: p.servers?.["2"]?.name || "", url: p.servers?.["2"]?.url || "" },
-        "3": { name: p.servers?.["3"]?.name || "", url: p.servers?.["3"]?.url || "" },
-        "4": { name: p.servers?.["4"]?.name || "", url: p.servers?.["4"]?.url || "" },
-      };
-      primaryServers[p.id] = p.primaryServer || "1";
+      urls[p.id] = createEditableServers(p.servers);
+      primaryServers[p.id] = getPrimaryServerId(urls[p.id], p.primaryServer);
     });
     setBulkInputUrls(urls);
     setBulkPrimaryServers(primaryServers);
@@ -248,21 +278,21 @@ export default function DashboardPage() {
     setIsBulkEditOpen(true);
   };
 
-  const handleInlineUrlChange = (slot: "1" | "2" | "3" | "4", val: string) => {
+  const handleInlineUrlChange = (slot: string, val: string) => {
     setInputUrls((prev) => ({
       ...prev,
       [slot]: {
-        ...prev[slot],
+        ...(prev[slot] ?? createEmptyServer()),
         url: val,
       },
     }));
   };
 
-  const handleInlineNameChange = (slot: "1" | "2" | "3" | "4", val: string) => {
+  const handleInlineNameChange = (slot: string, val: string) => {
     setInputUrls((prev) => ({
       ...prev,
       [slot]: {
-        ...prev[slot],
+        ...(prev[slot] ?? createEmptyServer()),
         name: val,
       },
     }));
@@ -292,8 +322,15 @@ export default function DashboardPage() {
     }
 
     try {
+      const cleanedServers = cleanServersForSave(inputUrls);
       const updatedPlayers = players.map((p) =>
-        p.id === editingPlayer.id ? { ...p, servers: inputUrls, primaryServer: editingPrimaryServer } : p
+        p.id === editingPlayer.id
+          ? {
+              ...p,
+              servers: cleanedServers,
+              primaryServer: getPrimaryServerId(cleanedServers, editingPrimaryServer),
+            }
+          : p
       );
 
       const response = await fetch("/api/players", {
@@ -316,26 +353,26 @@ export default function DashboardPage() {
     }
   };
 
-  const handleBulkUrlChange = (playerId: string, slot: "1" | "2" | "3" | "4", val: string) => {
+  const handleBulkUrlChange = (playerId: string, slot: string, val: string) => {
     setBulkInputUrls((prev) => ({
       ...prev,
       [playerId]: {
         ...prev[playerId],
         [slot]: {
-          ...prev[playerId][slot],
+            ...(prev[playerId]?.[slot] ?? createEmptyServer()),
           url: val,
         },
       },
     }));
   };
 
-  const handleBulkNameChange = (playerId: string, slot: "1" | "2" | "3" | "4", val: string) => {
+  const handleBulkNameChange = (playerId: string, slot: string, val: string) => {
     setBulkInputUrls((prev) => ({
       ...prev,
       [playerId]: {
         ...prev[playerId],
         [slot]: {
-          ...prev[playerId][slot],
+            ...(prev[playerId]?.[slot] ?? createEmptyServer()),
           name: val,
         },
       },
@@ -347,6 +384,59 @@ export default function DashboardPage() {
       ...prev,
       [playerId]: slot,
     }));
+  };
+
+  const handleAddInlineServer = () => {
+    setInputUrls((prev) => ({
+      ...prev,
+      [getNextServerSlot(prev)]: createEmptyServer(),
+    }));
+  };
+
+  const handleRemoveInlineServer = (slot: string) => {
+    setInputUrls((prev) => {
+      const next = { ...prev };
+      delete next[slot];
+      return Object.keys(next).length > 0 ? next : createEditableServers();
+    });
+
+    if (editingPrimaryServer === slot) {
+      const nextServers = { ...inputUrls };
+      delete nextServers[slot];
+      setEditingPrimaryServer(getPrimaryServerId(nextServers));
+    }
+  };
+
+  const handleAddBulkServer = (playerId: string) => {
+    setBulkInputUrls((prev) => {
+      const current = prev[playerId] ?? createEditableServers();
+      return {
+        ...prev,
+        [playerId]: {
+          ...current,
+          [getNextServerSlot(current)]: createEmptyServer(),
+        },
+      };
+    });
+  };
+
+  const handleRemoveBulkServer = (playerId: string, slot: string) => {
+    setBulkInputUrls((prev) => {
+      const current = prev[playerId] ?? createEditableServers();
+      const next = { ...current };
+      delete next[slot];
+      return {
+        ...prev,
+        [playerId]: Object.keys(next).length > 0 ? next : createEditableServers(),
+      };
+    });
+
+    if (bulkPrimaryServers[playerId] === slot) {
+      const current = bulkInputUrls[playerId] ?? createEditableServers();
+      const next = { ...current };
+      delete next[slot];
+      handleBulkPrimaryServerChange(playerId, getPrimaryServerId(next));
+    }
   };
 
   const handleSaveBulk = async (e: React.FormEvent) => {
@@ -377,11 +467,14 @@ export default function DashboardPage() {
     }
 
     try {
-      const updatedPlayers = players.map((p) => ({
-        ...p,
-        servers: bulkInputUrls[p.id] || p.servers,
-        primaryServer: bulkPrimaryServers[p.id] || p.primaryServer,
-      }));
+      const updatedPlayers = players.map((p) => {
+        const cleanedServers = cleanServersForSave(bulkInputUrls[p.id] || p.servers);
+        return {
+          ...p,
+          servers: cleanedServers,
+          primaryServer: getPrimaryServerId(cleanedServers, bulkPrimaryServers[p.id] || p.primaryServer),
+        };
+      });
 
       const response = await fetch("/api/players", {
         method: "POST",
@@ -430,10 +523,10 @@ export default function DashboardPage() {
   const getActiveStreamUrl = (player: PlayerConfig): string => {
     if (!player.servers) return "";
     const primary = player.primaryServer || "1";
-    if (player.servers[primary as "1" | "2" | "3" | "4"]?.url) {
-      return player.servers[primary as "1" | "2" | "3" | "4"].url;
+    if (player.servers[primary]?.url) {
+      return player.servers[primary].url;
     }
-    return player.servers["1"]?.url || player.servers["2"]?.url || player.servers["3"]?.url || player.servers["4"]?.url || "";
+    return sortServerIds(player.servers).map((slot) => player.servers[slot]?.url).find(Boolean) || "";
   };
 
   const TeamLogoThumb = ({
@@ -1023,9 +1116,9 @@ export default function DashboardPage() {
 
                   <div className="flex items-center gap-2">
                     {/* Server Hot-Swap Switcher Pill Selector */}
-                    {Object.keys(player.servers || {}).some((slot) => player.servers[slot as "1" | "2" | "3" | "4"]?.url) && (
-                      <div className="flex items-center gap-0.5 bg-white/[0.02] border border-white/5 px-1 py-0.5 rounded-md mr-1 select-none">
-                        {(["1", "2", "3", "4"] as const).map((slot) => {
+                    {Object.keys(player.servers || {}).some((slot) => player.servers[slot]?.url) && (
+                      <div className="flex max-w-[160px] items-center gap-0.5 overflow-x-auto bg-white/[0.02] border border-white/5 px-1 py-0.5 rounded-md mr-1 select-none">
+                        {sortServerIds(player.servers).map((slot) => {
                           const hasUrl = !!player.servers[slot]?.url;
                           const isPrimary = (player.primaryServer || "1") === slot;
                           if (!hasUrl) return null;
@@ -1034,7 +1127,7 @@ export default function DashboardPage() {
                               key={slot}
                               type="button"
                               onClick={(e) => handleHotSwapPrimaryServer(player.id, slot, e)}
-                              className={`text-[8px] font-extrabold w-4 h-4 flex items-center justify-center rounded transition-all active:scale-90 cursor-pointer ${
+                              className={`text-[8px] font-extrabold min-w-4 h-4 px-1 flex items-center justify-center rounded transition-all active:scale-90 cursor-pointer ${
                                 isPrimary
                                   ? "bg-violet-600 text-white shadow shadow-violet-500/30 font-extrabold"
                                   : "text-slate-500 hover:text-slate-300 hover:bg-white/5"
@@ -1217,7 +1310,7 @@ export default function DashboardPage() {
             <form onSubmit={handleSaveConfig} className="flex flex-col flex-1 min-h-0 mt-4">
               {/* Scrollable Form Body */}
               <div className="space-y-4 flex-1 min-h-0 overflow-y-auto pr-1 mb-4">
-                {(["1", "2", "3", "4"] as const).map((slot) => (
+                {sortServerIds(inputUrls).map((slot) => (
                   <div key={slot} className="bg-black/40 border border-white/5 rounded-xl p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-bold text-violet-400">Server Slot {slot}</span>
@@ -1237,6 +1330,15 @@ export default function DashboardPage() {
                           <span className="text-[8px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
                             Active
                           </span>
+                        )}
+                        {sortServerIds(inputUrls).length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveInlineServer(slot)}
+                            className="px-2 py-0.5 rounded text-[8px] font-bold transition-all border border-rose-500/20 text-rose-300 hover:text-white hover:bg-rose-500/10 cursor-pointer"
+                          >
+                            Remove
+                          </button>
                         )}
                       </div>
                     </div>
@@ -1264,6 +1366,14 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 ))}
+
+                <button
+                  type="button"
+                  onClick={handleAddInlineServer}
+                  className="w-full rounded-xl border border-dashed border-violet-500/25 bg-violet-500/5 px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-violet-300 hover:bg-violet-500/10 hover:text-white transition-all cursor-pointer"
+                >
+                  + Add Stream Server
+                </button>
 
                 {saveError && (
                   <div className="text-rose-400 text-[10px] bg-rose-500/5 py-2 px-3 rounded-lg border border-rose-500/10">
@@ -1343,7 +1453,7 @@ export default function DashboardPage() {
             <form onSubmit={handleSaveBulk} className="flex flex-col flex-1 min-h-0 mt-4">
               {/* Scrollable Form Body */}
               <div className="flex-1 min-h-0 overflow-y-auto pr-1 py-2 space-y-3 mb-4">
-                {(["1", "2", "3", "4"] as const).map((slot) => (
+                {sortServerIds(bulkInputUrls[activeBulkTab] ?? createEditableServers()).map((slot) => (
                   <div key={slot} className="bg-black/40 border border-white/5 rounded-xl p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-bold text-violet-400">Server Slot {slot}</span>
@@ -1363,6 +1473,15 @@ export default function DashboardPage() {
                           <span className="text-[8px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
                             Active
                           </span>
+                        )}
+                        {sortServerIds(bulkInputUrls[activeBulkTab] ?? createEditableServers()).length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveBulkServer(activeBulkTab, slot)}
+                            className="px-2 py-0.5 rounded text-[8px] font-bold transition-all border border-rose-500/20 text-rose-300 hover:text-white hover:bg-rose-500/10 cursor-pointer"
+                          >
+                            Remove
+                          </button>
                         )}
                       </div>
                     </div>
@@ -1390,6 +1509,14 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 ))}
+
+                <button
+                  type="button"
+                  onClick={() => handleAddBulkServer(activeBulkTab)}
+                  className="w-full rounded-xl border border-dashed border-violet-500/25 bg-violet-500/5 px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-violet-300 hover:bg-violet-500/10 hover:text-white transition-all cursor-pointer"
+                >
+                  + Add Stream Server
+                </button>
 
                 {saveError && (
                   <div className="flex items-center gap-2 text-rose-400 text-[10px] bg-rose-500/5 py-2 px-3 rounded-lg border border-rose-500/10">

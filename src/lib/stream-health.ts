@@ -1,4 +1,4 @@
-export type StreamServerId = "1" | "2" | "3" | "4";
+export type StreamServerId = string;
 
 export interface StreamServerOption {
   id: StreamServerId;

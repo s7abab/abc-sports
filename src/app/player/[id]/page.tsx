@@ -10,12 +10,7 @@ interface PlayerConfig {
   id: string;
   name: string;
   primaryServer: string;
-  servers: {
-    "1": { name: string; url: string };
-    "2": { name: string; url: string };
-    "3": { name: string; url: string };
-    "4": { name: string; url: string };
-  };
+  servers: Record<string, { name: string; url: string }>;
 }
 
 function useIsMobile() {
@@ -35,7 +30,7 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
   const playerId = resolvedParams.id;
 
   const [player, setPlayer] = useState<PlayerConfig | null>(null);
-  const [activeServerId, setActiveServerId] = useState<"1" | "2" | "3" | "4" | null>(null);
+  const [activeServerId, setActiveServerId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -87,12 +82,10 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
 
             // Default to primary server slot, falling back to first available slot if primary is unconfigured
             const primary = found.primaryServer || "1";
-            if (found.servers?.[primary as "1" | "2" | "3" | "4"]?.url) {
-              setActiveServerId(primary as "1" | "2" | "3" | "4");
+            if (found.servers?.[primary]?.url) {
+              setActiveServerId(primary);
             } else {
-              const availableSlots = (["1", "2", "3", "4"] as const).filter(
-                (slot) => found.servers?.[slot]?.url
-              );
+              const availableSlots = Object.keys(found.servers ?? {}).filter((slot) => found.servers?.[slot]?.url);
               if (availableSlots.length > 0) {
                 setActiveServerId(availableSlots[0]);
               }
@@ -128,7 +121,7 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
 
   // Filter available servers
   const availableServers = player?.servers
-    ? (["1", "2", "3", "4"] as const)
+    ? Object.keys(player.servers)
         .filter((slot) => player.servers[slot]?.url)
         .map((slot) => ({
           id: slot,

@@ -13,15 +13,8 @@ export interface PlayerConfig {
   id: string;
   name: string;
   primaryServer: string;
-  servers: {
-    "1": PlayerServer;
-    "2": PlayerServer;
-    "3": PlayerServer;
-    "4": PlayerServer;
-  };
+  servers: Record<string, PlayerServer>;
 }
-
-type ServerSlot = "1" | "2" | "3" | "4";
 
 const SEED_PATH = path.join(process.cwd(), "data", "players.json");
 
@@ -60,28 +53,60 @@ function normalizeServer(value: unknown): PlayerServer {
   };
 }
 
+function normalizeServers(value: unknown): Record<string, PlayerServer> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {
+      "1": createEmptyServer(),
+      "2": createEmptyServer(),
+      "3": createEmptyServer(),
+      "4": createEmptyServer(),
+    };
+  }
+
+  const input = value as Record<string, unknown>;
+  const normalized = Object.entries(input).reduce<Record<string, PlayerServer>>(
+    (servers, [slot, server]) => {
+      const id = slot.trim();
+      if (!id) return servers;
+      servers[id] = normalizeServer(server);
+      return servers;
+    },
+    {}
+  );
+
+  if (Object.keys(normalized).length === 0) {
+    return {
+      "1": createEmptyServer(),
+      "2": createEmptyServer(),
+      "3": createEmptyServer(),
+      "4": createEmptyServer(),
+    };
+  }
+
+  return normalized;
+}
+
 function normalizePlayer(value: unknown, position = 0): PlayerConfig | null {
   if (!value || typeof value !== "object") {
     return null;
   }
 
-  const player = value as Partial<PlayerConfig> & { servers?: Partial<Record<ServerSlot, unknown>> };
+  const player = value as Partial<PlayerConfig> & { servers?: unknown };
   if (typeof player.id !== "string") {
     return null;
   }
 
-  const servers: Partial<Record<ServerSlot, unknown>> = player.servers ?? {};
+  const servers = normalizeServers(player.servers);
+  const firstServerId = Object.keys(servers)[0] ?? "1";
 
   return {
     id: player.id,
     name: typeof player.name === "string" ? player.name : `Player ${position + 1}`,
-    primaryServer: typeof player.primaryServer === "string" ? player.primaryServer : "1",
-    servers: {
-      "1": normalizeServer(servers["1"]),
-      "2": normalizeServer(servers["2"]),
-      "3": normalizeServer(servers["3"]),
-      "4": normalizeServer(servers["4"]),
-    },
+    primaryServer:
+      typeof player.primaryServer === "string" && servers[player.primaryServer]
+        ? player.primaryServer
+        : firstServerId,
+    servers,
   };
 }
 
@@ -131,21 +156,14 @@ export async function readPlayers(): Promise<PlayerConfig[]> {
   }
 
   return (data ?? []).map((row) => {
-    const servers =
-      row.servers && typeof row.servers === "object" && !Array.isArray(row.servers)
-        ? (row.servers as Partial<Record<ServerSlot, unknown>>)
-        : {};
+    const servers = normalizeServers(row.servers);
+    const firstServerId = Object.keys(servers)[0] ?? "1";
 
     return {
     id: row.id,
     name: row.name,
-    primaryServer: row.primary_server,
-    servers: {
-      "1": normalizeServer(servers["1"]),
-      "2": normalizeServer(servers["2"]),
-      "3": normalizeServer(servers["3"]),
-      "4": normalizeServer(servers["4"]),
-    },
+    primaryServer: servers[row.primary_server] ? row.primary_server : firstServerId,
+    servers,
     };
   });
 }
