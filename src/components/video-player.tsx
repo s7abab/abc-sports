@@ -428,15 +428,15 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
             }`}>
               {/* Watermark aligned to the top right of the video bounds */}
               <div className="absolute top-3 right-1.5 pointer-events-none">
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-950/90 backdrop-blur-md border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.5)] transition-all duration-300 hover:border-violet-500/30">
-                  {/* Brand Logo Mark */}
-                  <div className="w-4 h-4 rounded-full bg-gradient-to-tr from-violet-600 to-fuchsia-600 flex items-center justify-center text-[9px] font-black text-white shrink-0 shadow-sm tracking-tighter select-none">
-                    A
+                <div className="flex items-center rounded-lg overflow-hidden border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.55)] transition-all duration-300 hover:border-violet-500/30 text-xs sm:text-[13px] font-black uppercase tracking-widest leading-none select-none">
+                  {/* Left Segment: "abc" with Gradient Background */}
+                  <div className="bg-gradient-to-tr from-violet-600 to-fuchsia-600 px-3.5 py-2 flex items-center justify-center border-r border-white/10 shrink-0">
+                    <span className="text-white">abc</span>
                   </div>
-                  {/* Brand Typography */}
-                  <span className="text-[10px] font-black tracking-widest uppercase text-slate-100 shrink-0">
-                    abc sports
-                  </span>
+                  {/* Right Segment: "sports" with Dark Slate Background */}
+                  <div className="bg-slate-950/95 backdrop-blur-md px-3.5 py-2 flex items-center shrink-0">
+                    <span className="text-violet-400">sports</span>
+                  </div>
                 </div>
               </div>
             </div>
