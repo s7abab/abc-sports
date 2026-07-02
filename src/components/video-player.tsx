@@ -428,9 +428,13 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
             }`}>
               {/* Watermark aligned to the top right of the video bounds */}
               <div className="absolute top-3 right-1.5 pointer-events-none">
-                <div className="flex items-center gap-2 px-4 py-2 rounded-md bg-black border border-white/10 shadow-md min-w-[120px] justify-center">
-                  <span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse shrink-0" />
-                  <span className="text-[10px] sm:text-xs font-black tracking-widest uppercase text-slate-100 shrink-0">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-950/90 backdrop-blur-md border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.5)] transition-all duration-300 hover:border-violet-500/30">
+                  {/* Brand Logo Mark */}
+                  <div className="w-4 h-4 rounded-full bg-gradient-to-tr from-violet-600 to-fuchsia-600 flex items-center justify-center text-[9px] font-black text-white shrink-0 shadow-sm tracking-tighter select-none">
+                    A
+                  </div>
+                  {/* Brand Typography */}
+                  <span className="text-[10px] font-black tracking-widest uppercase text-slate-100 shrink-0">
                     abc sports
                   </span>
                 </div>
