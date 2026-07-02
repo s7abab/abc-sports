@@ -53,7 +53,7 @@ function MatchCardCountdownOnly({
   }
 
   return (
-    <span className="text-xs font-extrabold text-emerald-400 tabular-nums animate-pulse">
+    <span className="text-xs font-extrabold text-violet-400 tabular-nums animate-pulse">
       {countdownText}
     </span>
   );
@@ -189,21 +189,21 @@ export default function Home() {
     .sort((first, second) => getMatchSortValue(first.date) - getMatchSortValue(second.date));
 
   return (
-    <main className="relative min-h-screen bg-zinc-950 px-4 pt-6 sm:pt-8 pb-12 text-zinc-100 sm:px-6 lg:px-8 font-sans overflow-x-hidden selection:bg-emerald-500/20 selection:text-white">
+    <main className="relative min-h-screen bg-[#09090b] px-4 pt-6 sm:pt-8 pb-12 text-slate-100 sm:px-6 lg:px-8 font-sans overflow-x-hidden selection:bg-violet-500/20 selection:text-white">
       {/* Background soft glowing accent */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(16,185,129,0.07),transparent_50rem)] pointer-events-none" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-violet-950/20 via-[#09090b] to-[#09090b] pointer-events-none z-0" />
 
       <div className="relative mx-auto w-full max-w-4xl">
         <header className="mb-6 flex items-center justify-between border-b border-white/[0.06] pb-6">
           <div className="flex items-center gap-3.5">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center font-black text-black text-sm tracking-tighter shadow-[0_4px_20px_rgba(52,211,153,0.25)]">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-violet-600 to-fuchsia-600 flex items-center justify-center font-black text-white text-sm tracking-tighter shadow-[0_4px_20px_rgba(139,92,246,0.25)]">
               ABC
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight text-white bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
                 ABC SPORTS
               </h1>
-              <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-semibold mt-0.5">
+              <p className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold mt-0.5">
                 Match Schedule & Streams
               </p>
             </div>
@@ -225,8 +225,8 @@ export default function Home() {
 
         {isLoading ? (
           <div className="mt-8 rounded-2xl border border-white/[0.06] bg-white/[0.01] p-12 text-center backdrop-blur-md flex flex-col items-center justify-center gap-3 animate-pulse">
-            <Loader2 className="h-8 w-8 text-emerald-400 animate-spin" />
-            <p className="text-xs text-zinc-400">Loading schedule in your timezone...</p>
+            <Loader2 className="h-8 w-8 text-violet-400 animate-spin" />
+            <p className="text-xs text-slate-400">Loading schedule in your timezone...</p>
           </div>
         ) : error ? (
           <div className="mt-8 rounded-2xl border border-rose-500/20 bg-rose-500/5 p-12 text-center backdrop-blur-md">
@@ -254,14 +254,14 @@ export default function Home() {
                   className={`relative overflow-hidden rounded-2xl border p-3 sm:p-4 flex flex-col justify-between shadow-lg transition-all duration-300 group cursor-pointer ${
                     match.runtimeStatus === "live"
                       ? "border-rose-500/40 bg-gradient-to-b from-[#251014] to-[#12080a] shadow-[0_0_15px_rgba(244,63,94,0.1)] hover:border-rose-500 hover:shadow-[0_0_25px_rgba(244,63,94,0.2)]"
-                      : "border-[#3c4043]/60 bg-[#202124] hover:bg-[#303134] hover:border-zinc-500"
+                      : "border-white/10 bg-[#0f1115]/60 backdrop-blur-md hover:bg-[#181a22]/60 hover:border-violet-500/20"
                   }`}
                 >
                   {/* Top Row: Competition Name & Header */}
                   <div className={`flex items-center justify-between text-[11px] font-normal border-b pb-2 mb-3 ${
                     match.runtimeStatus === "live"
                       ? "text-rose-300 border-rose-950/40"
-                      : "text-zinc-400 border-[#3c4043]/20"
+                      : "text-slate-400 border-white/[0.05]"
                   }`}>
                     <span className="truncate max-w-[75%] font-medium">
                       {match.competition}
@@ -272,7 +272,7 @@ export default function Home() {
                           ON AIR
                         </span>
                       ) : isNext ? (
-                        <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-400">
+                        <span className="inline-flex items-center gap-1 rounded bg-violet-500/10 border border-violet-500/25 px-1.5 py-0.5 text-[9px] font-semibold text-violet-400">
                           NEXT
                         </span>
                       ) : null}
@@ -329,8 +329,8 @@ export default function Home() {
 
                   {/* Bottom Row: Countdown footer */}
                   {match.runtimeStatus !== "completed" && match.runtimeStatus !== "live" && (
-                    <div className="mt-3 pt-2.5 border-t border-[#3c4043]/30 flex items-center justify-center gap-1.5 text-[10px] font-medium text-zinc-400">
-                      <span className="text-[8px] text-zinc-500 uppercase tracking-widest font-bold">Starts in</span>
+                    <div className="mt-3 pt-2.5 border-t border-white/[0.05] flex items-center justify-center gap-1.5 text-[10px] font-medium text-slate-400">
+                      <span className="text-[8px] text-slate-500 uppercase tracking-widest font-bold">Starts in</span>
                       <MatchCardCountdownOnly matchDateString={match.date} />
                     </div>
                   )}

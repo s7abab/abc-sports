@@ -129,18 +129,20 @@ export default function MatchDetailsPage({
 
   if (isLoading) {
     return (
-      <main className="relative min-h-screen bg-zinc-950 px-4 pt-6 sm:pt-8 pb-12 text-zinc-100 sm:px-6 lg:px-8 font-sans flex flex-col items-center justify-center overflow-x-hidden">
-        <Loader2 className="h-8 w-8 text-emerald-400 animate-spin" />
-        <p className="text-xs text-zinc-400 mt-2">Loading match details...</p>
+      <main className="relative min-h-screen bg-[#09090b] px-4 pt-6 sm:pt-8 pb-12 text-slate-100 sm:px-6 lg:px-8 font-sans flex flex-col items-center justify-center overflow-x-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-violet-950/20 via-[#09090b] to-[#09090b] pointer-events-none z-0" />
+        <Loader2 className="h-8 w-8 text-violet-400 animate-spin z-10" />
+        <p className="text-xs text-slate-400 mt-2 z-10">Loading match details...</p>
       </main>
     );
   }
 
   if (error || !match) {
     return (
-      <main className="relative min-h-screen bg-zinc-950 px-4 pt-6 sm:pt-8 pb-12 text-zinc-100 sm:px-6 lg:px-8 font-sans flex flex-col items-center justify-center overflow-x-hidden">
-        <p className="text-sm text-rose-400">{error || "Failed to load match details."}</p>
-        <Link href="/" className="mt-4 text-xs font-semibold uppercase tracking-wider text-zinc-500 hover:text-zinc-300">
+      <main className="relative min-h-screen bg-[#09090b] px-4 pt-6 sm:pt-8 pb-12 text-slate-100 sm:px-6 lg:px-8 font-sans flex flex-col items-center justify-center overflow-x-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-violet-950/20 via-[#09090b] to-[#09090b] pointer-events-none z-0" />
+        <p className="text-sm text-rose-400 z-10">{error || "Failed to load match details."}</p>
+        <Link href="/" className="mt-4 text-xs font-semibold uppercase tracking-wider text-slate-400 hover:text-white transition-colors z-10">
           ← Back to Schedule
         </Link>
       </main>
@@ -150,19 +152,19 @@ export default function MatchDetailsPage({
   const liveStart = getMatchLiveStart(match.date);
 
   return (
-    <main className="relative min-h-screen bg-zinc-950 px-4 pt-6 sm:pt-8 pb-12 text-zinc-100 sm:px-6 lg:px-8 font-sans flex flex-col items-center overflow-x-hidden selection:bg-emerald-500/20 selection:text-white">
+    <main className="relative min-h-screen bg-[#09090b] px-4 pt-6 sm:pt-8 pb-12 text-slate-100 sm:px-6 lg:px-8 font-sans flex flex-col items-center overflow-x-hidden selection:bg-violet-500/20 selection:text-white">
       {/* Background soft glowing accent */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,rgba(16,185,129,0.08),transparent_55rem)] pointer-events-none" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-violet-950/20 via-[#09090b] to-[#09090b] pointer-events-none z-0" />
 
-      <div className="relative mx-auto w-full max-w-xl flex flex-col">
+      <div className="relative mx-auto w-full max-w-xl flex flex-col z-10">
         <Link
           href="/"
-          className="mb-4 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-500 hover:text-zinc-300 transition-colors"
+          className="mb-4 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400 hover:text-white transition-colors"
         >
           ← Back to Schedule
         </Link>
 
-        <section className="relative overflow-hidden rounded-3xl border border-white/[0.07] bg-white/[0.02] backdrop-blur-xl p-8 sm:p-12 shadow-[0_20px_50px_rgba(0,0,0,0.5)] text-center group">
+        <section className="relative overflow-hidden rounded-3xl border border-white/10 bg-[#0f1115]/60 backdrop-blur-md p-8 sm:p-12 shadow-[0_20px_50px_rgba(0,0,0,0.5)] text-center group transition-all duration-300 hover:border-violet-500/20">
           <p className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">
             {match.competition}
           </p>
@@ -192,7 +194,7 @@ export default function MatchDetailsPage({
           {status === "completed" ? (
             <div className="mt-10 border-t border-white/[0.05] pt-8 flex flex-col items-center justify-center animate-in fade-in duration-300">
               <div className="h-12 w-12 rounded-full bg-zinc-900/50 border border-white/10 flex items-center justify-center mb-4">
-                <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <svg className="w-5 h-5 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>

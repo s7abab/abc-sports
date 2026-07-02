@@ -50,7 +50,7 @@ export function MatchCountdown({
       {items.map((item) => (
         <div
           key={item.label}
-          className="flex flex-col items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.02] py-3.5 px-2 backdrop-blur-md shadow-sm transition-all duration-300 hover:border-white/10 hover:bg-white/[0.04]"
+          className="flex flex-col items-center justify-center rounded-xl border border-white/10 bg-[#0f1115]/60 py-3.5 px-2 backdrop-blur-md shadow-sm transition-all duration-300 hover:border-violet-500/20 hover:bg-[#181a22]/60"
         >
           <span className="text-xl sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-b from-white to-zinc-400 tracking-tight tabular-nums">
             {String(item.value).padStart(2, "0")}
