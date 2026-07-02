@@ -639,12 +639,10 @@ export default function DashboardPage() {
                     <input
                       type="date"
                       value={matchForm.date}
-                      min={getRelativeDateKey("today")}
-                      max={getRelativeDateKey("tomorrow")}
                       onChange={(e) => setMatchForm((prev) => ({ ...prev, date: e.target.value }))}
                       className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition focus:border-violet-500/50"
                     />
-                    <p className="text-[10px] text-slate-500">Pick today or tomorrow.</p>
+                    <p className="text-[10px] text-slate-500">Pick any date.</p>
                   </label>
                 </div>
 

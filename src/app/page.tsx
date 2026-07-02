@@ -1,6 +1,10 @@
-import Link from "next/link";
+"use client";
 
-import { readMatches } from "@/lib/match-storage";
+import React, { useEffect, useState } from "react";
+import Link from "next/link";
+import { Loader2 } from "lucide-react";
+
+import type { MatchConfig } from "@/lib/match-storage";
 import {
   deriveRuntimeMatchStatus,
   formatMatchDate,
@@ -87,8 +91,30 @@ function matchHref(match: { id: string; playerId: string; runtimeStatus: Runtime
   return `/match/${match.id}`;
 }
 
-export default async function Home() {
-  const matches = await readMatches();
+export default function Home() {
+  const [matches, setMatches] = useState<MatchConfig[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function fetchMatches() {
+      try {
+        const response = await fetch("/api/matches");
+        if (response.ok) {
+          const data = await response.json();
+          setMatches(data);
+        } else {
+          setError("Failed to load match schedule.");
+        }
+      } catch (err) {
+        setError("An error occurred while loading schedule.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchMatches();
+  }, []);
+
   const now = new Date();
   const upcomingMatches = matches
     .map((match) => ({
@@ -120,14 +146,23 @@ export default async function Home() {
           </div>
         </header>
 
-        {upcomingMatches.length === 0 ? (
+        {isLoading ? (
+          <div className="mt-8 rounded-2xl border border-white/[0.06] bg-white/[0.01] p-12 text-center backdrop-blur-md flex flex-col items-center justify-center gap-3 animate-pulse">
+            <Loader2 className="h-8 w-8 text-emerald-400 animate-spin" />
+            <p className="text-xs text-zinc-400">Loading schedule in your timezone...</p>
+          </div>
+        ) : error ? (
+          <div className="mt-8 rounded-2xl border border-rose-500/20 bg-rose-500/5 p-12 text-center backdrop-blur-md">
+            <p className="text-sm text-rose-400">{error}</p>
+          </div>
+        ) : upcomingMatches.length === 0 ? (
           <div className="mt-8 rounded-2xl border border-white/[0.06] bg-white/[0.01] p-12 text-center backdrop-blur-md">
             <p className="text-sm text-zinc-500">
               No upcoming matches scheduled. Check back later!
             </p>
           </div>
         ) : (
-          <div className="grid gap-6 sm:grid-cols-2">
+          <div className="grid gap-6 sm:grid-cols-2 animate-in fade-in duration-300">
             {upcomingMatches.map((match, index) => {
               const isNext = index === 0;
               const meta = statusMeta(match.runtimeStatus);

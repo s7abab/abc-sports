@@ -1,7 +1,19 @@
 import { NextResponse } from "next/server";
-import { deleteMatch, updateMatch } from "@/lib/match-storage";
+import { deleteMatch, updateMatch, readMatch } from "@/lib/match-storage";
 
-
+export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await context.params;
+    const match = await readMatch(id);
+    if (!match) {
+      return NextResponse.json({ error: "Match not found" }, { status: 404 });
+    }
+    return NextResponse.json(match);
+  } catch (error: unknown) {
+    console.error("Error reading match:", error);
+    return NextResponse.json({ error: "Failed to read match" }, { status: 500 });
+  }
+}
 
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
   try {

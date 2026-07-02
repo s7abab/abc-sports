@@ -1,7 +1,11 @@
-import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+"use client";
 
-import { readMatch } from "@/lib/match-storage";
+import React, { useEffect, useState } from "react";
+import Link from "next/link";
+import { notFound, useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
+
+import type { MatchConfig } from "@/lib/match-storage";
 import {
   deriveRuntimeMatchStatus,
   formatMatchDate,
@@ -44,7 +48,7 @@ function TeamLogo({
       <img
         src={logoUrl}
         alt={`${name} logo`}
-        className={`${dimensions} rounded-full border border-white/10 bg-white object-contain ${padding} shadow-md transition-transform duration-300 group-hover:scale-105`}
+        className={`${dimensions} rounded-full border border-white/10 bg-white object-contain ${padding} shadow-sm transition-transform duration-300 group-hover:scale-105`}
       />
     );
   }
@@ -59,23 +63,71 @@ function TeamLogo({
   );
 }
 
-export default async function MatchDetailsPage({
+export default function MatchDetailsPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;
-  const match = await readMatch(id);
+  const router = useRouter();
+  const { id } = React.use(params);
 
-  if (!match) {
+  const [match, setMatch] = useState<MatchConfig | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function fetchMatch() {
+      try {
+        const response = await fetch(`/api/matches/${id}`);
+        if (response.status === 404) {
+          setError("not-found");
+        } else if (response.ok) {
+          const data = await response.json();
+          setMatch(data);
+        } else {
+          setError("Failed to load match details.");
+        }
+      } catch (err) {
+        setError("An error occurred while loading match details.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchMatch();
+  }, [id]);
+
+  const status = match ? deriveRuntimeMatchStatus(match.date) : null;
+  const playerHref = match ? `/player/${match.playerId}` : "";
+
+  // Auto redirect if match is live
+  useEffect(() => {
+    if (status === "live" && playerHref) {
+      router.replace(playerHref);
+    }
+  }, [status, playerHref, router]);
+
+  if (error === "not-found") {
     notFound();
   }
 
-  const status = deriveRuntimeMatchStatus(match.date);
-  const playerHref = `/player/${match.playerId}`;
+  if (isLoading) {
+    return (
+      <main className="relative min-h-screen bg-zinc-950 px-4 pt-6 sm:pt-8 pb-12 text-zinc-100 sm:px-6 lg:px-8 font-sans flex flex-col items-center justify-center overflow-x-hidden">
+        <Loader2 className="h-8 w-8 text-emerald-400 animate-spin" />
+        <p className="text-xs text-zinc-400 mt-2">Loading match details...</p>
+      </main>
+    );
+  }
 
-  if (status === "live") {
-    redirect(playerHref);
+  if (error || !match) {
+    return (
+      <main className="relative min-h-screen bg-zinc-950 px-4 pt-6 sm:pt-8 pb-12 text-zinc-100 sm:px-6 lg:px-8 font-sans flex flex-col items-center justify-center overflow-x-hidden">
+        <p className="text-sm text-rose-400">{error || "Failed to load match details."}</p>
+        <Link href="/" className="mt-4 text-xs font-semibold uppercase tracking-wider text-zinc-500 hover:text-zinc-300">
+          ← Back to Schedule
+        </Link>
+      </main>
+    );
   }
 
   const liveStart = getMatchLiveStart(match.date);
