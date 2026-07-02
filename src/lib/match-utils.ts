@@ -164,6 +164,34 @@ export function formatMatchDate(dateString: string): string {
   const [, time = "00:00"] = dateString.split("T");
   const [hours, minutes] = time.split(":").map(Number);
   const date = new Date(year, month - 1, day, hours || 0, minutes || 0);
+
+  // Calculate day difference relative to the user's current local date
+  const now = new Date();
+  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const matchMidnight = new Date(year, month - 1, day);
+  const diffTime = matchMidnight.getTime() - todayMidnight.getTime();
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+  let relativeDay = "";
+  if (diffDays === 0) {
+    relativeDay = "Today";
+  } else if (diffDays === 1) {
+    relativeDay = "Tomorrow";
+  } else if (diffDays === -1) {
+    relativeDay = "Yesterday";
+  }
+
+  if (relativeDay) {
+    if (hasTime) {
+      const timeFormatted = date.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+      }).toLowerCase();
+      return `${relativeDay}, ${timeFormatted}`;
+    }
+    return relativeDay;
+  }
+
   return new Intl.DateTimeFormat("en-US", {
     month: "long",
     day: "numeric",

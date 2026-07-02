@@ -640,7 +640,12 @@ export default function DashboardPage() {
                       type="date"
                       value={matchForm.date}
                       onChange={(e) => setMatchForm((prev) => ({ ...prev, date: e.target.value }))}
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition focus:border-violet-500/50"
+                      onClick={(e) => {
+                        try {
+                          e.currentTarget.showPicker();
+                        } catch (err) {}
+                      }}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition focus:border-violet-500/50 cursor-pointer"
                     />
                     <p className="text-[10px] text-slate-500">Pick any date.</p>
                   </label>
@@ -655,7 +660,12 @@ export default function DashboardPage() {
                       type="time"
                       value={matchForm.time}
                       onChange={(e) => setMatchForm((prev) => ({ ...prev, time: e.target.value }))}
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition focus:border-violet-500/50"
+                      onClick={(e) => {
+                        try {
+                          e.currentTarget.showPicker();
+                        } catch (err) {}
+                      }}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition focus:border-violet-500/50 cursor-pointer"
                     />
                     <p className="text-[10px] text-slate-500">Optional, but recommended.</p>
                   </label>

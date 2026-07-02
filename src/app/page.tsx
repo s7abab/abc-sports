@@ -2,15 +2,62 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
+import { Loader2, Tv, Info } from "lucide-react";
 
 import type { MatchConfig } from "@/lib/match-storage";
 import {
   deriveRuntimeMatchStatus,
   formatMatchDate,
   getMatchSortValue,
+  getMatchLiveStart,
   type RuntimeMatchStatus,
 } from "@/lib/match-utils";
+
+function MatchCardCountdownOnly({
+  matchDateString,
+}: {
+  matchDateString: string;
+}) {
+  const [remainingMs, setRemainingMs] = useState<number | null>(null);
+
+  useEffect(() => {
+    const liveStart = getMatchLiveStart(matchDateString);
+    if (!liveStart) return;
+
+    const update = () => {
+      setRemainingMs(liveStart.getTime() - Date.now());
+    };
+
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [matchDateString]);
+
+  if (remainingMs === null || remainingMs <= 0) {
+    return null;
+  }
+
+  const totalSeconds = Math.max(0, Math.floor(remainingMs / 1000));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  let countdownText = "";
+  if (days > 0) {
+    countdownText = `${days}d ${hours}h ${minutes}m`;
+  } else if (hours > 0) {
+    countdownText = `${hours}h ${minutes}m ${seconds}s`;
+  } else {
+    countdownText = `${minutes}m ${seconds}s`;
+  }
+
+  return (
+    <span className="text-xs font-extrabold text-emerald-400 tabular-nums animate-pulse">
+      {countdownText}
+    </span>
+  );
+}
 
 function TeamLogo({
   name,
@@ -37,9 +84,9 @@ function TeamLogo({
     padding = "p-1";
     font = "text-xs";
   } else if (size === "lg") {
-    dimensions = "h-20 w-20";
-    padding = "p-2.5";
-    font = "text-xl";
+    dimensions = "h-14 w-14";
+    padding = "p-1.5";
+    font = "text-sm";
   }
 
   if (logoUrl) {
@@ -162,71 +209,81 @@ export default function Home() {
             </p>
           </div>
         ) : (
-          <div className="grid gap-6 sm:grid-cols-2 animate-in fade-in duration-300">
+          <div className="grid gap-4 sm:grid-cols-2 animate-in fade-in duration-300">
             {upcomingMatches.map((match, index) => {
               const isNext = index === 0;
-              const meta = statusMeta(match.runtimeStatus);
+              const formattedDate = formatMatchDate(match.date);
+              const parts = formattedDate.split(", ");
+              const relativeDay = parts[0];
+              const timeString = parts[1] || "";
+
               return (
                 <Link
                   key={match.id}
                   href={matchHref(match)}
-                  className="relative overflow-hidden rounded-2xl border border-white/[0.05] bg-white/[0.01] backdrop-blur-md p-4 transition-all duration-300 hover:bg-white/[0.03] hover:border-white/10 hover:shadow-[0_8px_25px_rgba(0,0,0,0.5)] group flex flex-col justify-between"
+                  className="relative overflow-hidden rounded-2xl border border-[#3c4043]/60 bg-[#202124] p-3 sm:p-4 flex flex-col justify-between shadow-lg transition-all duration-300 hover:bg-[#303134] hover:border-zinc-500 group cursor-pointer"
                 >
-                  {/* Top Row: Competition Name & Badges */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                  {/* Top Row: Competition Name & Header */}
+                  <div className="flex items-center justify-between text-[11px] text-zinc-400 font-normal border-b border-[#3c4043]/20 pb-2 mb-3">
+                    <span className="truncate max-w-[75%] font-medium">
                       {match.competition}
                     </span>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                       {isNext && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 px-2 py-0.5 text-[9px] font-semibold text-emerald-400">
+                        <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-400">
                           NEXT
                         </span>
                       )}
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-medium border ${meta.className}`}
-                      >
-                        {match.runtimeStatus === "live" && (
-                          <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
-                        )}
-                        {meta.label}
-                      </span>
                     </div>
                   </div>
 
-                  {/* Middle Matchup Row with Big Logos */}
-                  <div className="my-4 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+                  {/* Middle Matchup Row: Home Team, Status/Time, Away Team */}
+                  <div className="grid grid-cols-[1.2fr_1fr_1.2fr] items-center gap-2 text-center">
                     {/* Home Team */}
-                    <div className="flex flex-col items-center text-center gap-1.5 min-w-0">
-                      <TeamLogo name={match.home} logoUrl={match.homeLogoUrl} size="md" />
-                      <span className="text-xs font-semibold text-zinc-200 group-hover:text-white transition-colors truncate w-full">
+                    <div className="flex flex-col items-center min-w-0">
+                      <TeamLogo name={match.home} logoUrl={match.homeLogoUrl} size="lg" />
+                      <span className="text-xs font-semibold text-zinc-200 truncate w-full mt-1.5 group-hover:text-white transition-colors">
                         {match.home}
                       </span>
                     </div>
 
-                    {/* VS Center Divider */}
-                    <div className="flex flex-col items-center gap-1 shrink-0 px-2">
-                      <span className="text-[10px] font-bold text-zinc-500 bg-zinc-900/60 px-1.5 py-0.5 rounded border border-white/[0.05] shadow-inner select-none">
-                        VS
-                      </span>
+                    {/* Date/Status Center */}
+                    <div className="flex flex-col items-center justify-center shrink-0">
+                      {match.runtimeStatus === "live" ? (
+                        <span className="text-[11px] font-bold tracking-wider text-rose-500 uppercase flex items-center justify-center gap-1.5">
+                          <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />
+                          Live
+                        </span>
+                      ) : (
+                        <>
+                          <span className="text-[11px] font-medium text-zinc-400 uppercase tracking-wide">
+                            {relativeDay}
+                          </span>
+                          {timeString && (
+                            <span className="text-base font-extrabold text-white mt-0.5 tracking-tight">
+                              {timeString}
+                            </span>
+                          )}
+                        </>
+                      )}
                     </div>
 
                     {/* Away Team */}
-                    <div className="flex flex-col items-center text-center gap-1.5 min-w-0">
-                      <TeamLogo name={match.away} logoUrl={match.awayLogoUrl} size="md" />
-                      <span className="text-xs font-semibold text-zinc-200 group-hover:text-white transition-colors truncate w-full">
+                    <div className="flex flex-col items-center min-w-0">
+                      <TeamLogo name={match.away} logoUrl={match.awayLogoUrl} size="lg" />
+                      <span className="text-xs font-semibold text-zinc-200 truncate w-full mt-1.5 group-hover:text-white transition-colors">
                         {match.away}
                       </span>
                     </div>
                   </div>
 
-                  {/* Bottom Row: Date & Action Link */}
-                  <div className="border-t border-white/[0.04] pt-3 flex items-center justify-between text-xs">
-                    <span className="text-zinc-400 font-medium text-[11px]">{formatMatchDate(match.date)}</span>
-                    <span className="text-[10px] text-emerald-400 font-semibold uppercase tracking-wider flex items-center gap-1 group-hover:translate-x-0.5 transition-transform duration-300">
-                      {match.runtimeStatus === "live" ? "Watch Live →" : "Details →"}
-                    </span>
-                  </div>
+                  {/* Bottom Row: Countdown footer */}
+                  {match.runtimeStatus !== "completed" && match.runtimeStatus !== "live" && (
+                    <div className="mt-3 pt-2.5 border-t border-[#3c4043]/30 flex items-center justify-center gap-1.5 text-[10px] font-medium text-zinc-400">
+                      <span className="text-[8px] text-zinc-500 uppercase tracking-widest font-bold">Starts in</span>
+                      <MatchCardCountdownOnly matchDateString={match.date} />
+                    </div>
+                  )}
                 </Link>
               );
             })}
