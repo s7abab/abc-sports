@@ -232,6 +232,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
             thumbnails={thumbnails}
             icons={defaultLayoutIcons}
             slots={{
+              timeSlider: null,
               pipButton: null,
               beforeFullscreenButton: (
                 <div className="flex items-center">
