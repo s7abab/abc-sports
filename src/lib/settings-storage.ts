@@ -1,39 +1,52 @@
-import fs from "fs";
-import path from "path";
+import { getSupabaseStorageClient } from "@/lib/supabase-storage";
 
-const SETTINGS_PATH = path.join(process.cwd(), "data", "settings.json");
+const SETTINGS_ROW_ID = "singleton";
 
 export interface AppSettings {
   whatsappUrl: string;
 }
 
-export function readSettings(): AppSettings {
-  try {
-    if (fs.existsSync(SETTINGS_PATH)) {
-      const raw = fs.readFileSync(SETTINGS_PATH, "utf-8");
-      const parsed = JSON.parse(raw);
-      return {
-        whatsappUrl: typeof parsed.whatsappUrl === "string" ? parsed.whatsappUrl.trim() : "",
-      };
-    }
-  } catch (error) {
-    console.error("Failed to read settings file:", error);
-  }
-  return { whatsappUrl: "" };
+function normalizeWhatsappUrl(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
 }
 
-export function saveSettings(settings: Partial<AppSettings>): AppSettings {
-  const current = readSettings();
-  const next: AppSettings = {
-    whatsappUrl: typeof settings.whatsappUrl === "string" ? settings.whatsappUrl.trim() : current.whatsappUrl,
-  };
-  
-  // Make sure the data directory exists
-  const dir = path.dirname(SETTINGS_PATH);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+export async function readSettings(): Promise<AppSettings> {
+  const supabase = getSupabaseStorageClient();
+  const { data, error } = await supabase
+    .from("app_settings")
+    .select("whatsapp_url")
+    .eq("id", SETTINGS_ROW_ID)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
   }
 
-  fs.writeFileSync(SETTINGS_PATH, JSON.stringify(next, null, 2), "utf-8");
+  return {
+    whatsappUrl: normalizeWhatsappUrl(data?.whatsapp_url),
+  };
+}
+
+export async function saveSettings(settings: Partial<AppSettings>): Promise<AppSettings> {
+  const next: AppSettings = {
+    whatsappUrl: normalizeWhatsappUrl(settings.whatsappUrl),
+  };
+
+  const supabase = getSupabaseStorageClient();
+  const { error } = await supabase
+    .from("app_settings")
+    .upsert(
+      {
+        id: SETTINGS_ROW_ID,
+        whatsapp_url: next.whatsappUrl,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "id" }
+    );
+
+  if (error) {
+    throw error;
+  }
+
   return next;
 }

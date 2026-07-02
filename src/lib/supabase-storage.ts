@@ -73,6 +73,20 @@ interface Database {
         Update: Partial<Database["public"]["Tables"]["chat_messages"]["Insert"]>;
         Relationships: [];
       };
+      app_settings: {
+        Row: {
+          id: string;
+          whatsapp_url: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          whatsapp_url: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["app_settings"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
