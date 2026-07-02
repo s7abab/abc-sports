@@ -195,7 +195,7 @@ export default function Home() {
 
       <div className="relative mx-auto w-full max-w-4xl">
         <header className="mb-6 flex items-center justify-between border-b border-white/[0.06] pb-6">
-          <div className="-ml-4 flex items-center gap-3.5 sm:-ml-6">
+          <div className="flex -translate-x-6 items-center gap-3.5 sm:-translate-x-10">
             <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-violet-600 to-fuchsia-600 flex items-center justify-center font-black text-white text-sm tracking-tighter shadow-[0_4px_20px_rgba(139,92,246,0.25)]">
               ABC
             </div>
