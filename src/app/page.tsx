@@ -223,19 +223,31 @@ export default function Home() {
                 <Link
                   key={match.id}
                   href={matchHref(match)}
-                  className="relative overflow-hidden rounded-2xl border border-[#3c4043]/60 bg-[#202124] p-3 sm:p-4 flex flex-col justify-between shadow-lg transition-all duration-300 hover:bg-[#303134] hover:border-zinc-500 group cursor-pointer"
+                  className={`relative overflow-hidden rounded-2xl border p-3 sm:p-4 flex flex-col justify-between shadow-lg transition-all duration-300 group cursor-pointer ${
+                    match.runtimeStatus === "live"
+                      ? "border-rose-500/40 bg-gradient-to-b from-[#251014] to-[#12080a] shadow-[0_0_15px_rgba(244,63,94,0.1)] hover:border-rose-500 hover:shadow-[0_0_25px_rgba(244,63,94,0.2)]"
+                      : "border-[#3c4043]/60 bg-[#202124] hover:bg-[#303134] hover:border-zinc-500"
+                  }`}
                 >
                   {/* Top Row: Competition Name & Header */}
-                  <div className="flex items-center justify-between text-[11px] text-zinc-400 font-normal border-b border-[#3c4043]/20 pb-2 mb-3">
+                  <div className={`flex items-center justify-between text-[11px] font-normal border-b pb-2 mb-3 ${
+                    match.runtimeStatus === "live"
+                      ? "text-rose-300 border-rose-950/40"
+                      : "text-zinc-400 border-[#3c4043]/20"
+                  }`}>
                     <span className="truncate max-w-[75%] font-medium">
                       {match.competition}
                     </span>
                     <div className="flex items-center gap-2 shrink-0">
-                      {isNext && (
+                      {match.runtimeStatus === "live" ? (
+                        <span className="inline-flex items-center gap-1 rounded bg-rose-500/20 border border-rose-500/30 px-1.5 py-0.5 text-[9px] font-bold text-rose-300 uppercase tracking-wide">
+                          ON AIR
+                        </span>
+                      ) : isNext ? (
                         <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-400">
                           NEXT
                         </span>
-                      )}
+                      ) : null}
                     </div>
                   </div>
 
@@ -252,10 +264,18 @@ export default function Home() {
                     {/* Date/Status Center */}
                     <div className="flex flex-col items-center justify-center shrink-0">
                       {match.runtimeStatus === "live" ? (
-                        <span className="text-[11px] font-bold tracking-wider text-rose-500 uppercase flex items-center justify-center gap-1.5">
-                          <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />
-                          Live
-                        </span>
+                        <div className="flex flex-col items-center gap-1.5">
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-red-600 px-2.5 py-0.5 text-[9px] font-black text-white uppercase tracking-widest shadow-[0_2px_8px_rgba(220,38,38,0.4)]">
+                            <span className="relative flex h-1.5 w-1.5">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
+                            </span>
+                            Live
+                          </span>
+                          <span className="text-[9px] text-rose-300/80 font-bold uppercase tracking-wider group-hover:text-white transition-colors">
+                            Watch Now
+                          </span>
+                        </div>
                       ) : (
                         <>
                           <span className="text-[11px] font-medium text-zinc-400 uppercase tracking-wide">
@@ -284,6 +304,13 @@ export default function Home() {
                     <div className="mt-3 pt-2.5 border-t border-[#3c4043]/30 flex items-center justify-center gap-1.5 text-[10px] font-medium text-zinc-400">
                       <span className="text-[8px] text-zinc-500 uppercase tracking-widest font-bold">Starts in</span>
                       <MatchCardCountdownOnly matchDateString={match.date} />
+                    </div>
+                  )}
+
+                  {match.runtimeStatus === "live" && (
+                    <div className="mt-3 pt-2.5 border-t border-rose-500/20 flex items-center justify-center gap-1.5 text-[10px] font-semibold text-rose-400 group-hover:text-rose-200 transition-colors">
+                      <Tv className="h-3.5 w-3.5 text-rose-500 group-hover:text-rose-300 transition-colors animate-pulse" />
+                      <span className="text-[9px] uppercase tracking-wider font-extrabold">Watch Stream Live</span>
                     </div>
                   )}
                 </Link>
