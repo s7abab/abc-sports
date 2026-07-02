@@ -66,9 +66,24 @@ function renderMessageBody(body: string) {
 export function LiveMatchChat({ playerId, roomTitle, isOverlay = false, onClose }: LiveMatchChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [messageText, setMessageText] = useState("");
-  const [viewerName, setViewerName] = useState("Fan");
-  const [nameInput, setNameInput] = useState("Fan");
+  const [viewerName, setViewerName] = useState("");
+  const [nameInput, setNameInput] = useState("");
+  const [hasSetName, setHasSetName] = useState(false);
+
+  useEffect(() => {
+    const savedName = localStorage.getItem("chat_viewer_name");
+    if (savedName) {
+      const normalized = normalizeDisplayName(savedName);
+      if (normalized) {
+        setViewerName(normalized);
+        setNameInput(normalized);
+        setHasSetName(true);
+      }
+    }
+  }, []);
+
   const [isSending, setIsSending] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
   const [isSocketLive, setIsSocketLive] = useState(false);
   const [error, setError] = useState("");
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -398,14 +413,22 @@ export function LiveMatchChat({ playerId, roomTitle, isOverlay = false, onClose 
       <div className={`flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2`}>
         <div className="flex min-w-0 items-center gap-1.5">
           <MessageCircle className="h-4.5 w-4.5 text-emerald-400 shrink-0" />
-          <div className="min-w-0 flex items-baseline gap-1.5">
+          <div className="min-w-0 flex items-center gap-1.5 flex-wrap">
             <h2 className="truncate font-black text-xs uppercase tracking-wider text-white">
               Chat
             </h2>
-            {!isOverlay && (
-              <span className="truncate text-[10px] font-bold text-slate-500 max-w-[120px]">
-                ({roomTitle})
-              </span>
+            {hasSetName && (
+              <div className="flex items-center gap-1 text-[10px] font-black shrink-0 select-none ml-1.5">
+                <span className="text-emerald-400">{viewerName}</span>
+                <button
+                  type="button"
+                  onClick={() => setHasSetName(false)}
+                  className="text-slate-500 hover:text-emerald-300 transition cursor-pointer underline font-semibold ml-0.5 text-[9px]"
+                  title="Change your chat display name"
+                >
+                  (Edit)
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -492,7 +515,14 @@ export function LiveMatchChat({ playerId, roomTitle, isOverlay = false, onClose 
             <button
               key={reaction}
               type="button"
-              onClick={() => sendMessage(reaction, "reaction")}
+              onClick={() => {
+                if (!hasSetName) {
+                  nameInputRef.current?.focus();
+                  setError("Please enter your name to react.");
+                  return;
+                }
+                sendMessage(reaction, "reaction");
+              }}
               className={`grid shrink-0 place-items-center rounded-full border border-white/10 bg-white/[0.06] transition hover:border-emerald-200/40 hover:bg-emerald-300/10 cursor-pointer ${
                 isOverlay ? "h-7 w-7 text-sm" : "h-9 w-9 text-lg"
               }`}
@@ -502,23 +532,6 @@ export function LiveMatchChat({ playerId, roomTitle, isOverlay = false, onClose 
               {reaction}
             </button>
           ))}
-        </div>
-
-        <div className={`flex items-center gap-2 rounded-xl border border-white/10 bg-black/25 ${isOverlay ? "mb-2 px-2.5 py-1" : "mb-3 px-3 py-2"}`}>
-          <UserRound className={`shrink-0 text-slate-400 ${isOverlay ? "h-3.5 w-3.5" : "h-4 w-4"}`} />
-          <input
-            value={nameInput}
-            onChange={(event) => handleNameChange(event.target.value)}
-            onBlur={() => {
-              if (!normalizeDisplayName(nameInput)) {
-                handleNameChange(viewerName);
-              }
-            }}
-            maxLength={MAX_NAME_LENGTH}
-            placeholder="Your name"
-            className="min-w-0 flex-1 bg-transparent text-xs font-black text-white outline-none placeholder:text-slate-500"
-            aria-label="Your chat name"
-          />
         </div>
 
         {mentionSuggestions.length > 0 ? (
@@ -539,28 +552,67 @@ export function LiveMatchChat({ playerId, roomTitle, isOverlay = false, onClose 
           </div>
         ) : null}
 
-        <form onSubmit={handleSubmit} className="flex items-center gap-2">
-          <input
-            value={messageText}
-            onChange={(event) => setMessageText(event.target.value)}
-            maxLength={280}
-            placeholder={`Message as ${viewerName}. Use @ to tag`}
-            className={`min-w-0 flex-1 rounded-xl border border-white/10 bg-black/30 outline-none transition placeholder:text-slate-500 focus:border-emerald-200/45 ${
-              isOverlay ? "px-2.5 py-1.5 text-xs" : "px-3.5 py-3 text-sm"
-            }`}
-          />
-          <button
-            type="submit"
-            disabled={!messageText.trim() || isSending}
-            className={`grid shrink-0 place-items-center rounded-xl bg-emerald-300 text-emerald-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/25 cursor-pointer ${
-              isOverlay ? "h-8 w-8" : "h-11 w-11"
-            }`}
-            title="Send message"
-            aria-label="Send message"
+        {!hasSetName ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const trimmed = nameInput.trim();
+              const normalized = normalizeDisplayName(trimmed);
+              if (normalized) {
+                setViewerName(normalized);
+                localStorage.setItem("chat_viewer_name", normalized);
+                setHasSetName(true);
+                setError("");
+              }
+            }}
+            className="flex items-center gap-2"
           >
-            <Send className={isOverlay ? "h-3.5 w-3.5" : "h-4.5 w-4.5"} />
-          </button>
-        </form>
+            <input
+              ref={nameInputRef}
+              type="text"
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              maxLength={MAX_NAME_LENGTH}
+              placeholder="Enter name to start chatting..."
+              className={`min-w-0 flex-1 rounded-xl border border-white/10 bg-black/30 outline-none transition placeholder:text-slate-500 focus:border-emerald-200/45 ${
+                isOverlay ? "px-2.5 py-1.5 text-xs" : "px-3.5 py-3 text-sm"
+              }`}
+              required
+            />
+            <button
+              type="submit"
+              disabled={!nameInput.trim()}
+              className={`grid shrink-0 place-items-center rounded-xl bg-emerald-300 text-emerald-950 font-bold transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/25 cursor-pointer ${
+                isOverlay ? "h-8 px-3 text-xs" : "h-11 px-4 text-xs uppercase tracking-wider"
+              }`}
+            >
+              Join
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleSubmit} className="flex items-center gap-2">
+            <input
+              value={messageText}
+              onChange={(event) => setMessageText(event.target.value)}
+              maxLength={280}
+              placeholder={`Message as ${viewerName}. Use @ to tag`}
+              className={`min-w-0 flex-1 rounded-xl border border-white/10 bg-black/30 outline-none transition placeholder:text-slate-500 focus:border-emerald-200/45 ${
+                isOverlay ? "px-2.5 py-1.5 text-xs" : "px-3.5 py-3 text-sm"
+              }`}
+            />
+            <button
+              type="submit"
+              disabled={!messageText.trim() || isSending}
+              className={`grid shrink-0 place-items-center rounded-xl bg-emerald-300 text-emerald-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/25 cursor-pointer ${
+                isOverlay ? "h-8 w-8" : "h-11 w-11"
+              }`}
+              title="Send message"
+              aria-label="Send message"
+            >
+              <Send className={isOverlay ? "h-3.5 w-3.5" : "h-4.5 w-4.5"} />
+            </button>
+          </form>
+        )}
 
         {error ? <p className="mt-2 text-xs font-semibold text-amber-200">{error}</p> : null}
       </div>
