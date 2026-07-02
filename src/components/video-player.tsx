@@ -427,16 +427,17 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                 : "w-full h-full"
             }`}>
               {/* Watermark aligned to the top right of the video bounds */}
-              <div className="absolute top-3 right-1.5 pointer-events-none">
-                <div className="flex items-center rounded-lg overflow-hidden border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.55)] transition-all duration-300 hover:border-violet-500/30 text-xs sm:text-[13px] font-black uppercase tracking-widest leading-none select-none">
-                  {/* Left Segment: "abc" with Gradient Background */}
-                  <div className="bg-gradient-to-tr from-violet-600 to-fuchsia-600 px-3.5 py-2 flex items-center justify-center border-r border-white/10 shrink-0">
-                    <span className="text-white">abc</span>
+              <div className="absolute top-[3.5%] right-[2.5%] pointer-events-none">
+                <div className="flex items-center gap-[clamp(4px,0.5vw,8px)] px-[clamp(10px,1.2vw,16px)] py-[clamp(5px,0.8vw,10px)] rounded-[clamp(6px,0.8vw,10px)] bg-slate-950/95 backdrop-blur-md border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.55)] transition-all duration-300 hover:border-violet-500/30">
+                  {/* Brand Logo Mark */}
+                  <div className="w-[clamp(14px,1.5vw,18px)] h-[clamp(14px,1.5vw,18px)] rounded-full bg-gradient-to-tr from-violet-600 to-fuchsia-600 flex items-center justify-center text-[clamp(8px,1vw,10px)] font-black text-white shrink-0 shadow-sm tracking-tighter select-none">
+                    A
                   </div>
-                  {/* Right Segment: "sports" with Dark Slate Background */}
-                  <div className="bg-slate-950/95 backdrop-blur-md px-3.5 py-2 flex items-center shrink-0">
+                  {/* Brand Typography */}
+                  <span className="text-[clamp(10px,1.2vw,14px)] font-black tracking-widest uppercase shrink-0 select-none">
+                    <span className="text-slate-100">abc</span>{" "}
                     <span className="text-violet-400">sports</span>
-                  </div>
+                  </span>
                 </div>
               </div>
             </div>
