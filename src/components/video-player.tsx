@@ -24,6 +24,8 @@ interface VideoPlayerProps {
   servers?: Array<{ id: "1" | "2" | "3" | "4"; name: string }>;
   activeServerId?: "1" | "2" | "3" | "4" | null;
   onServerChange?: (id: "1" | "2" | "3" | "4") => void;
+  isAutoSwitchEnabled?: boolean;
+  isFloatingEnabled?: boolean;
 }
 
 const PIPToggle = () => {
@@ -58,11 +60,21 @@ const PIPToggle = () => {
 };
 
 export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
-  ({ src, title, thumbnails, onPlay, onPause, children, muted = false, autoPlay = false, isChatOpen = false, onToggleChat, playerId, isMobile = false, servers = [], activeServerId, onServerChange }, ref) => {
+  ({ src, title, thumbnails, onPlay, onPause, children, muted = false, autoPlay = false, isChatOpen = false, onToggleChat, playerId, isMobile = false, servers = [], activeServerId, onServerChange, isAutoSwitchEnabled = true, isFloatingEnabled = false }, ref) => {
     const [objectFit, setObjectFit] = useState<"contain" | "cover" | "fill">("contain");
     const [isServerMenuOpen, setIsServerMenuOpen] = useState(false);
-    const [isFloatingEnabled, setIsFloatingEnabled] = useState(false); // Disabled initially
     const playerRef = useRef<MediaPlayerInstance>(null);
+    const [isGracePeriodActive, setIsGracePeriodActive] = useState(true);
+
+    useEffect(() => {
+      if (activeServerId) {
+        setIsGracePeriodActive(true);
+        const timer = setTimeout(() => {
+          setIsGracePeriodActive(false);
+        }, 15000); // 15 seconds grace period when changing server
+        return () => clearTimeout(timer);
+      }
+    }, [activeServerId]);
 
     useEffect(() => {
       const playerEl = playerRef.current;
@@ -142,6 +154,9 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
           return next;
         });
 
+        // Only switch automatically if auto-switching is enabled
+        if (!isAutoSwitchEnabled) return;
+
         // Switch immediately to next server if we have other servers
         const allFailed = servers.every((s) => s.id === activeServerId || failedServers.has(s.id));
         if (!allFailed && onServerChange) {
@@ -157,13 +172,20 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
           }
         }
       }
-    }, [error, activeServerId, servers, onServerChange, failedServers]);
+    }, [error, activeServerId, servers, onServerChange, failedServers, isAutoSwitchEnabled]);
 
     useEffect(() => {
       let intervalId: NodeJS.Timeout;
 
-      // Stall can be either playback buffering (waiting) OR loading taking too long
-      const isStalled = (waiting || (!canPlay && loadingTimeout)) && !error;
+      // If auto-switching is disabled, clear switching states and do nothing
+      if (!isAutoSwitchEnabled) {
+        setCountdown(null);
+        setNextServerName(null);
+        return;
+      }
+
+      // Stall can be either playback buffering (waiting) OR loading taking too long, but only outside the initial grace period
+      const isStalled = !isGracePeriodActive && (waiting || (!canPlay && loadingTimeout)) && !error;
 
       if (isStalled && activeServerId && servers.length > 0) {
         const allFailed = servers.every((s) => failedServers.has(s.id));
@@ -181,7 +203,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
             setNextServerName(nextServer.name);
           }
 
-          let localCountdown = 5; // Give it 5 seconds to try
+          let localCountdown = 8; // Give it 8 seconds to buffer/retry before auto-switching
           setCountdown(localCountdown);
 
           intervalId = setInterval(() => {
@@ -229,7 +251,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
       return () => {
         if (intervalId) clearInterval(intervalId);
       };
-    }, [waiting, canPlay, loadingTimeout, error, servers, activeServerId, onServerChange, failedServers]);
+    }, [waiting, canPlay, loadingTimeout, error, servers, activeServerId, onServerChange, failedServers, isAutoSwitchEnabled, isGracePeriodActive]);
 
     const toggleFit = () => {
       setObjectFit((prev) => {
@@ -329,6 +351,12 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                                 key={srv.id}
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  // Clear failed status when user manually switches to this server
+                                  setFailedServers((prev) => {
+                                    const next = new Set(prev);
+                                    next.delete(srv.id);
+                                    return next;
+                                  });
                                   onServerChange(srv.id);
                                   setIsServerMenuOpen(false);
                                 }}
@@ -349,6 +377,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                       )}
                     </div>
                   )}
+
                   {onToggleChat && (
                     <button
                       onClick={onToggleChat}
@@ -363,18 +392,6 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                       )}
                     </button>
                   )}
-                  <button
-                    onClick={() => setIsFloatingEnabled((prev) => !prev)}
-                    className="vds-button h-full aspect-square flex items-center justify-center transition-colors duration-150 mr-1.5 cursor-pointer"
-                    title={isFloatingEnabled ? "Disable Screen Overlay (Reactions/Chat)" : "Enable Screen Overlay (Reactions/Chat)"}
-                    aria-label="Toggle floating overlay"
-                  >
-                    {isFloatingEnabled ? (
-                      <ToggleRight className="w-5 h-5 text-emerald-400" />
-                    ) : (
-                      <ToggleLeft className="w-5 h-5 text-slate-400 hover:text-white" />
-                    )}
-                  </button>
                   <PIPToggle />
                    <button
                     onClick={toggleFit}
@@ -515,6 +532,12 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                         key={srv.id}
                         onClick={(e) => {
                           e.stopPropagation();
+                          // Clear failed status when user manually switches to this server
+                          setFailedServers((prev) => {
+                            const next = new Set(prev);
+                            next.delete(srv.id);
+                            return next;
+                          });
                           if (onServerChange) {
                             onServerChange(srv.id);
                           }

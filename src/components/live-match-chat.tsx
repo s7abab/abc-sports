@@ -395,29 +395,31 @@ export function LiveMatchChat({ playerId, roomTitle, isOverlay = false, onClose 
           : "flex h-[28rem] min-h-0 w-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0f1115]/95 shadow-2xl sm:h-[32rem] lg:sticky lg:top-6 lg:h-[min(72vh,38rem)] lg:min-h-[30rem]"
       }
     >
-      <div className={`flex items-center justify-between gap-3 border-b border-white/10 ${isOverlay ? "px-3 py-2" : "px-4 py-3"}`}>
-        <div className="flex min-w-0 items-center gap-2">
-          <span className={`grid shrink-0 place-items-center rounded-xl bg-emerald-300 text-emerald-950 ${isOverlay ? "h-7 w-7" : "h-9 w-9"}`}>
-            <MessageCircle className={isOverlay ? "h-4 w-4" : "h-5 w-5"} />
-          </span>
-          <div className="min-w-0">
-            <h2 className={`truncate font-black uppercase tracking-[0.16em] text-white ${isOverlay ? "text-xs" : "text-sm"}`}>
-              Live Chat
+      <div className={`flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2`}>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <MessageCircle className="h-4.5 w-4.5 text-emerald-400 shrink-0" />
+          <div className="min-w-0 flex items-baseline gap-1.5">
+            <h2 className="truncate font-black text-xs uppercase tracking-wider text-white">
+              Chat
             </h2>
-            {!isOverlay && <p className="truncate text-xs font-semibold text-slate-400">{roomTitle}</p>}
+            {!isOverlay && (
+              <span className="truncate text-[10px] font-bold text-slate-500 max-w-[120px]">
+                ({roomTitle})
+              </span>
+            )}
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
           <span
-            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.18em] ${
+            className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider ${
               isSocketLive
-                ? "border-red-400/30 bg-red-500/15 text-red-100"
-                : "border-amber-300/25 bg-amber-300/10 text-amber-100"
+                ? "border-red-400/30 bg-red-500/10 text-red-200"
+                : "border-amber-300/20 bg-amber-300/5 text-amber-200"
             }`}
           >
             <span
-              className={`h-1.2 w-1.2 rounded-full ${
-                isSocketLive ? "bg-red-400 shadow-[0_0_16px_rgba(248,113,113,0.9)]" : "bg-amber-300"
+              className={`h-1 w-1 rounded-full ${
+                isSocketLive ? "bg-red-400" : "bg-amber-300"
               }`}
             />
             {isSocketLive ? "Live" : "Sync"}
@@ -429,15 +431,15 @@ export function LiveMatchChat({ playerId, roomTitle, isOverlay = false, onClose 
               title="Close chat"
               aria-label="Close chat"
             >
-              <X className="h-4 w-4" />
+              <X className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
       </div>
 
       {!isOverlay && (
-        <div className="border-b border-white/10 bg-amber-300/[0.08] px-4 py-3 text-xs font-semibold leading-5 text-amber-100/85">
-          Keep it friendly. Spam and abusive messages may be removed.
+        <div className="border-b border-white/5 bg-white/[0.02] px-3 py-1 text-[10px] font-medium text-slate-500 select-none">
+          Keep it friendly. Spam and abusive comments may be removed.
         </div>
       )}
 
@@ -544,49 +546,23 @@ export function LiveMatchChat({ playerId, roomTitle, isOverlay = false, onClose 
             maxLength={280}
             placeholder={`Message as ${viewerName}. Use @ to tag`}
             className={`min-w-0 flex-1 rounded-xl border border-white/10 bg-black/30 outline-none transition placeholder:text-slate-500 focus:border-emerald-200/45 ${
-              isOverlay ? "px-2.5 py-1.5 text-xs" : "px-3 py-2.5 text-sm"
+              isOverlay ? "px-2.5 py-1.5 text-xs" : "px-3.5 py-3 text-sm"
             }`}
           />
           <button
             type="submit"
             disabled={!messageText.trim() || isSending}
             className={`grid shrink-0 place-items-center rounded-xl bg-emerald-300 text-emerald-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/25 cursor-pointer ${
-              isOverlay ? "h-8 w-8" : "h-10 w-10"
+              isOverlay ? "h-8 w-8" : "h-11 w-11"
             }`}
             title="Send message"
             aria-label="Send message"
           >
-            <Send className={isOverlay ? "h-3.5 w-3.5" : "h-4 w-4"} />
+            <Send className={isOverlay ? "h-3.5 w-3.5" : "h-4.5 w-4.5"} />
           </button>
         </form>
 
         {error ? <p className="mt-2 text-xs font-semibold text-amber-200">{error}</p> : null}
-
-        {/* Toggle switch row under the chat input */}
-        <div className="mt-2.5 flex items-center justify-between border-t border-white/5 pt-2.5 px-1 text-[10px] select-none">
-          <span className="font-bold text-slate-500 uppercase tracking-wider">Screen Overlay</span>
-          <button
-            type="button"
-            onClick={toggleFloating}
-            className="flex items-center gap-1.5 cursor-pointer group"
-            title={isFloatingEnabled ? "Disable floating overlay" : "Enable floating overlay"}
-          >
-            <span className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400 group-hover:text-slate-200 transition-colors">
-              Float
-            </span>
-            <div
-              className={`w-7 h-4 rounded-full relative transition-colors duration-300 ${
-                isFloatingEnabled ? "bg-emerald-400" : "bg-white/10"
-              }`}
-            >
-              <div
-                className={`w-2.8 h-2.8 rounded-full bg-white absolute top-0.6 transition-all duration-300 ${
-                  isFloatingEnabled ? "left-[14px]" : "left-[2px]"
-                }`}
-              />
-            </div>
-          </button>
-        </div>
       </div>
     </aside>
   );

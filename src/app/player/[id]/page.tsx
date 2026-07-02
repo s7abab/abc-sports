@@ -4,7 +4,7 @@ import React, { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { VideoPlayer } from "@/components/video-player";
 import { LiveMatchChat } from "@/components/live-match-chat";
-import { Loader2 } from "lucide-react";
+import { Loader2, Server, Smile } from "lucide-react";
 
 interface PlayerConfig {
   id: string;
@@ -41,6 +41,37 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [whatsappUrl, setWhatsappUrl] = useState("");
   const isMobile = useIsMobile();
+  const [isAutoSwitchEnabled, setIsAutoSwitchEnabled] = useState<boolean>(true);
+  const [isFloatingEnabled, setIsFloatingEnabled] = useState<boolean>(false);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("auto_switch_server_enabled");
+    if (stored !== null) {
+      setIsAutoSwitchEnabled(stored === "true");
+    }
+  }, []);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("live_chat_float_enabled");
+    if (stored !== null) {
+      setIsFloatingEnabled(stored === "true");
+    }
+  }, []);
+
+  const toggleAutoSwitch = () => {
+    const next = !isAutoSwitchEnabled;
+    setIsAutoSwitchEnabled(next);
+    localStorage.setItem("auto_switch_server_enabled", String(next));
+  };
+
+  const toggleFloating = () => {
+    const next = !isFloatingEnabled;
+    setIsFloatingEnabled(next);
+    localStorage.setItem("live_chat_float_enabled", String(next));
+    window.dispatchEvent(
+      new CustomEvent("live-chat-float-toggled", { detail: { enabled: next } })
+    );
+  };
 
   const toggleChat = () => setIsChatOpen((prev) => !prev);
 
@@ -108,15 +139,15 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
   const currentStreamUrl = player && activeServerId ? player.servers[activeServerId]?.url : "";
 
   return (
-    <main className="min-h-screen bg-[#09090b] text-slate-100 flex flex-col relative overflow-hidden">
+    <main className="min-h-screen bg-[#09090b] text-slate-100 flex flex-col relative overflow-x-hidden">
       {/* Decorative gradient overlay */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-violet-950/20 via-[#09090b] to-[#09090b] pointer-events-none z-0"></div>
 
-      <div className="w-full max-w-7xl mx-auto px-4 py-6 md:py-10 z-10 flex-grow flex flex-col justify-center gap-6">
-        <div className="flex items-center justify-between gap-4 border-b border-white/5 pb-4 mb-2 shrink-0">
+      <div className="w-full max-w-7xl mx-auto px-4 py-4 md:py-6 z-10 flex-grow flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-4 shrink-0 mb-1">
           <Link
             href="/"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500 hover:text-slate-300 transition-colors"
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-black hover:bg-white/5 border border-white/10 px-3.5 py-1.5 text-xs font-bold text-slate-300 hover:text-white transition-all duration-200 active:scale-95 shadow-md"
           >
             ← Back to Schedule
           </Link>
@@ -154,31 +185,99 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
             <p className="text-sm font-semibold text-rose-400">{error}</p>
           </div>
         ) : player && currentStreamUrl ? (
-          <div className={`grid w-full gap-4 items-start transition-all duration-300 ${
-            isChatOpen && !isMobile
-              ? "lg:grid-cols-[minmax(0,1fr)_24rem]"
-              : "grid-cols-1"
-          }`}>
-            <div className="flex min-w-0 flex-col gap-4">
-              <VideoPlayer
-                src={currentStreamUrl}
-                title={player.name}
-                autoPlay={true}
-                isChatOpen={isChatOpen}
-                onToggleChat={toggleChat}
-                playerId={playerId}
-                isMobile={isMobile}
-                servers={availableServers}
-                activeServerId={activeServerId}
-                onServerChange={(id) => setActiveServerId(id)}
-              />
-            </div>
+          <div className="flex flex-col gap-2 w-full">
+            <div className={`grid w-full gap-4 items-start transition-all duration-300 ${
+              isChatOpen
+                ? "lg:grid-cols-[minmax(0,1fr)_24rem] grid-cols-1"
+                : "grid-cols-1"
+            }`}>
+              <div className="flex min-w-0 flex-col gap-4">
+                <VideoPlayer
+                  src={currentStreamUrl}
+                  title={player.name}
+                  autoPlay={true}
+                  isChatOpen={isChatOpen}
+                  onToggleChat={toggleChat}
+                  playerId={playerId}
+                  isMobile={isMobile}
+                  servers={availableServers}
+                  activeServerId={activeServerId}
+                  onServerChange={(id) => setActiveServerId(id)}
+                  isAutoSwitchEnabled={isAutoSwitchEnabled}
+                  isFloatingEnabled={isFloatingEnabled}
+                />
+              </div>
 
-            {!isMobile && (
-              <div className={isChatOpen ? "block" : "hidden"}>
+              {/* Side Chat: Only visible on desktop when toggled open */}
+              <div className={`hidden lg:block ${isChatOpen ? "lg:block" : "lg:hidden"}`}>
                 <LiveMatchChat playerId={playerId} roomTitle={player.name} />
               </div>
-            )}
+            </div>
+
+            {/* Settings and Controls Card */}
+            <div className="w-full bg-[#0f1115]/60 backdrop-blur-md border border-white/10 rounded-xl p-3 md:py-2.5 md:px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 md:gap-4 transition-all duration-300 hover:border-violet-500/20">
+              {/* Auto-Switch Server Switch */}
+              <div className="flex items-center justify-between gap-3 w-full sm:w-auto">
+                <h3 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                  <Server className="w-3.5 h-3.5 text-violet-400" />
+                  Auto-Switch Server
+                </h3>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className={`text-[9px] font-bold tracking-wider uppercase transition-colors duration-200 ${isAutoSwitchEnabled ? "text-violet-400" : "text-slate-500"}`}>
+                    {isAutoSwitchEnabled ? "ON" : "OFF"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={toggleAutoSwitch}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out outline-none ${
+                      isAutoSwitchEnabled ? "bg-violet-600" : "bg-slate-800"
+                    }`}
+                    aria-label="Toggle automatic server switching"
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${
+                        isAutoSwitchEnabled ? "translate-x-4" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* Divider on desktop */}
+              <div className="hidden sm:block h-4 w-px bg-white/10" />
+
+              {/* Show Screen Overlay Switch */}
+              <div className="flex items-center justify-between gap-3 w-full sm:w-auto">
+                <h3 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                  <Smile className="w-3.5 h-3.5 text-emerald-400" />
+                  Screen Overlay
+                </h3>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className={`text-[9px] font-bold tracking-wider uppercase transition-colors duration-200 ${isFloatingEnabled ? "text-emerald-400" : "text-slate-500"}`}>
+                    {isFloatingEnabled ? "ON" : "OFF"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={toggleFloating}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out outline-none ${
+                      isFloatingEnabled ? "bg-emerald-600" : "bg-slate-800"
+                    }`}
+                    aria-label="Toggle floating screen overlay"
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${
+                        isFloatingEnabled ? "translate-x-4" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Chat: Always visible on all screen sizes below player & controls */}
+            <div className="w-full">
+              <LiveMatchChat playerId={playerId} roomTitle={player.name} />
+            </div>
           </div>
         ) : (
           <div className="aspect-video w-full rounded-2xl bg-black/40 border border-dashed border-white/5 flex flex-col items-center justify-center p-6 text-center select-none text-slate-500">
