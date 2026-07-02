@@ -84,6 +84,7 @@ export function useLiveStreamController({
   const reloadedDuringStallRef = useRef(false);
   const hlsFailureBurstRef = useRef(0);
   const handledErrorForSrcRef = useRef<string | null>(null);
+  const handledStartupFailureForSrcRef = useRef<string | null>(null);
   const reportedRecoveryRef = useRef(false);
   const lastReportedEventRef = useRef(new Map<string, number>());
 
@@ -194,17 +195,23 @@ export function useLiveStreamController({
   );
 
   const switchToBestServer = useCallback(
-    (reason: "error" | "stall" | "hls") => {
+    (reason: "error" | "stall" | "hls" | "startup") => {
       if (!activeServerId || !onServerChange || !isAutoSwitchEnabled || servers.length < 2) {
         return false;
       }
 
       const now = Date.now();
+      const shouldSwitchImmediately =
+        reason === "error" || reason === "hls" || reason === "startup";
       const watchedLongEnough =
         now - srcStartedAtRef.current >= STREAM_HEALTH_TARGETS.minimumWatchBeforeSwitchMs;
       const manualLockExpired = now >= manualLockUntilRef.current;
 
-      if (!watchedLongEnough || !manualLockExpired || now - lastSwitchAtRef.current < 15_000) {
+      if (
+        (!shouldSwitchImmediately && (!watchedLongEnough || !manualLockExpired)) ||
+        (!shouldSwitchImmediately &&
+          now - lastSwitchAtRef.current < STREAM_HEALTH_TARGETS.switchAfterStallMs)
+      ) {
         return false;
       }
 
@@ -296,6 +303,7 @@ export function useLiveStreamController({
     reloadedDuringStallRef.current = false;
     hlsFailureBurstRef.current = 0;
     handledErrorForSrcRef.current = null;
+    handledStartupFailureForSrcRef.current = null;
     reportedRecoveryRef.current = false;
 
     const resetTimer = window.setTimeout(() => {
@@ -371,6 +379,24 @@ export function useLiveStreamController({
         }
         setPhase("failed");
         switchToBestServer("error");
+        return;
+      }
+
+      if (!canPlay && startupAge > STREAM_HEALTH_TARGETS.startupGraceMs) {
+        const startupFailureKey = `${activeServerId}:${src}`;
+        if (handledStartupFailureForSrcRef.current === startupFailureKey) {
+          setPhase("degraded");
+          return;
+        }
+
+        handledStartupFailureForSrcRef.current = startupFailureKey;
+        markServerFailed(activeServerId, -25);
+        setCountdown(null);
+        setNextServerName(null);
+
+        if (!switchToBestServer("startup")) {
+          setPhase("degraded");
+        }
         return;
       }
 

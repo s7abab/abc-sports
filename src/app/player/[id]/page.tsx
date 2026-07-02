@@ -5,6 +5,7 @@ import Link from "next/link";
 import { VideoPlayer } from "@/components/video-player";
 import { LiveMatchChat } from "@/components/live-match-chat";
 import { Loader2, Server } from "lucide-react";
+import type { MediaPlayerInstance } from "@vidstack/react";
 
 interface PlayerConfig {
   id: string;
@@ -35,6 +36,7 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
   const [error, setError] = useState("");
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [whatsappUrl, setWhatsappUrl] = useState("");
+  const videoPlayerRef = React.useRef<MediaPlayerInstance>(null);
   const isMobile = useIsMobile();
   const [isAutoSwitchEnabled, setIsAutoSwitchEnabled] = useState<boolean>(() => {
     if (typeof window === "undefined") {
@@ -112,6 +114,25 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
 
   const currentStreamUrl = player && activeServerId ? player.servers[activeServerId]?.url : "";
 
+  const switchServer = (serverId: string) => {
+    const wasFullscreen = Boolean(videoPlayerRef.current?.state.fullscreen || document.fullscreenElement);
+    setActiveServerId(serverId);
+
+    if (!wasFullscreen) return;
+
+    const restoreFullscreen = () => {
+      const playerInstance = videoPlayerRef.current;
+      if (!playerInstance || playerInstance.state.fullscreen) return;
+
+      playerInstance.enterFullscreen("prefer-media").catch(() => {
+        // Browsers can reject programmatic fullscreen after a source change.
+      });
+    };
+
+    window.setTimeout(restoreFullscreen, 150);
+    window.setTimeout(restoreFullscreen, 700);
+  };
+
   return (
     <main className="min-h-screen bg-[#09090b] text-slate-100 flex flex-col relative overflow-x-hidden">
       {/* Decorative gradient overlay */}
@@ -167,6 +188,7 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
             }`}>
               <div className="flex min-w-0 flex-col gap-4">
                 <VideoPlayer
+                  ref={videoPlayerRef}
                   src={currentStreamUrl}
                   title={player.name}
                   autoPlay={true}
@@ -176,7 +198,7 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
                   isMobile={isMobile}
                   servers={availableServers}
                   activeServerId={activeServerId}
-                  onServerChange={(id) => setActiveServerId(id)}
+                  onServerChange={switchServer}
                   isAutoSwitchEnabled={isAutoSwitchEnabled}
                 />
               </div>
@@ -235,7 +257,7 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
                     <button
                       key={server.id}
                       type="button"
-                      onClick={() => setActiveServerId(server.id)}
+                      onClick={() => switchServer(server.id)}
                       className={`min-h-8 max-w-[9rem] rounded-lg border px-2.5 text-[10px] font-bold transition-all duration-200 active:scale-95 ${
                         activeServerId === server.id
                           ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300"

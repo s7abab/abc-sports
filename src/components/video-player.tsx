@@ -210,7 +210,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
         className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black/95 border border-white/10 shadow-2xl backdrop-blur-md transition-all duration-300 hover:border-violet-500/30 group"
       >
         <MediaPlayer
-          key={sourceVersion}
+          key={`${activeServerId ?? finalSrc}:${finalSrc}:${sourceVersion}`}
           className="w-full h-full select-none outline-none relative"
           title={title}
           src={finalSrc}

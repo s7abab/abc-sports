@@ -29,7 +29,7 @@ export interface StreamServerScore {
 }
 
 export const STREAM_HEALTH_TARGETS = {
-  startupGraceMs: 12_000,
+  startupGraceMs: 5_000,
   startupBufferTarget: 8,
   minimumPlayableBuffer: 4,
   healthyBufferTarget: 24,
@@ -37,11 +37,11 @@ export const STREAM_HEALTH_TARGETS = {
   maxLiveLatency: 75,
   catchupLatency: 45,
   catchupRate: 1.04,
-  switchAfterStallMs: 30_000,
-  reloadAfterStallMs: 12_000,
-  minimumWatchBeforeSwitchMs: 45_000,
-  serverCooldownMs: 120_000,
-  manualSelectionLockMs: 120_000,
+  switchAfterStallMs: 8_000,
+  reloadAfterStallMs: 4_000,
+  minimumWatchBeforeSwitchMs: 8_000,
+  serverCooldownMs: 45_000,
+  manualSelectionLockMs: 5_000,
   healthyRewardIntervalMs: 30_000,
 } as const;
 
