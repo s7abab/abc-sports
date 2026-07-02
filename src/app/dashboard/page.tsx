@@ -25,11 +25,15 @@ interface PlayerConfig {
 }
 
 export default function DashboardPage() {
-  const [activeTab, setActiveTab] = useState<"matches" | "players">("matches");
+  const [activeTab, setActiveTab] = useState<"matches" | "players" | "settings">("matches");
   const [players, setPlayers] = useState<PlayerConfig[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [matches, setMatches] = useState<MatchConfig[]>([]);
   const [isMatchesLoading, setIsMatchesLoading] = useState(true);
+  const [whatsappUrl, setWhatsappUrl] = useState("");
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [settingsError, setSettingsError] = useState("");
+  const [settingsSuccess, setSettingsSuccess] = useState(false);
   const [activeMatchFilter, setActiveMatchFilter] = useState<MatchStatus>("today");
   const [editingMatch, setEditingMatch] = useState<MatchConfig | null>(null);
   const [isSavingMatch, setIsSavingMatch] = useState(false);
@@ -129,9 +133,64 @@ export default function DashboardPage() {
         setIsMatchesLoading(false);
       }
     }
+
+    async function fetchSettings() {
+      try {
+        const response = await fetch("/api/settings");
+        if (response.ok) {
+          const data = await response.json();
+          setWhatsappUrl(data.whatsappUrl || "");
+        }
+      } catch (err) {
+        console.error("Error loading settings:", err);
+      }
+    }
+
     fetchPlayers();
     fetchMatches();
+    fetchSettings();
   }, []);
+
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingSettings(true);
+    setSettingsError("");
+    setSettingsSuccess(false);
+
+    if (whatsappUrl) {
+      try {
+        const parsed = new URL(whatsappUrl);
+        if (!["http:", "https:"].includes(parsed.protocol)) {
+          setSettingsError("Please enter a valid URL starting with http/https.");
+          setIsSavingSettings(false);
+          return;
+        }
+      } catch {
+        setSettingsError("Please enter a valid URL.");
+        setIsSavingSettings(false);
+        return;
+      }
+    }
+
+    try {
+      const response = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ whatsappUrl }),
+      });
+
+      if (response.ok) {
+        setSettingsSuccess(true);
+        setTimeout(() => setSettingsSuccess(false), 3000);
+      } else {
+        setSettingsError("Failed to save settings.");
+      }
+    } catch (err) {
+      setSettingsError("An error occurred while saving settings.");
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
 
   const handleCopyLink = (id: string, e: React.MouseEvent) => {
     e.stopPropagation(); // Avoid triggering details card navigation
@@ -599,9 +658,20 @@ export default function DashboardPage() {
           >
             Players
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("settings")}
+            className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] transition ${
+              activeTab === "settings"
+                ? "bg-white text-[#09090b]"
+                : "border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+            }`}
+          >
+            Settings
+          </button>
         </div>
 
-        {activeTab === "matches" ? (
+        {activeTab === "matches" && (
           <section className="grid gap-4 xl:grid-cols-[0.88fr_1.12fr]">
             <div className="rounded-2xl border border-white/5 bg-[#0f0f13] p-4 shadow-xl shadow-black/10">
               <div className="flex items-center justify-between gap-2">
@@ -906,7 +976,9 @@ export default function DashboardPage() {
               </div>
             </div>
           </section>
-        ) : (
+        )}
+
+        {activeTab === "players" && (
           <>
             <div className="rounded-2xl border border-white/5 bg-[#0f0f13] p-4 shadow-xl shadow-black/10">
               <div className="flex items-center justify-between gap-3">
@@ -1051,6 +1123,64 @@ export default function DashboardPage() {
               </div>
             )}
           </>
+        )}
+
+        {activeTab === "settings" && (
+          <section className="max-w-xl mx-auto w-full animate-in fade-in duration-300">
+            <div className="rounded-2xl border border-white/5 bg-[#0f0f13] p-6 shadow-xl shadow-black/10">
+              <div className="flex items-center gap-2 pb-4 border-b border-white/5 mb-6">
+                <Settings className="h-5 w-5 text-violet-500" />
+                <h2 className="text-xs font-bold uppercase tracking-wider text-white">
+                  Global App Settings
+                </h2>
+              </div>
+
+              <form onSubmit={handleSaveSettings} className="space-y-4">
+                <label className="space-y-1.5 block">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                    WhatsApp Group Join Link
+                  </span>
+                  <input
+                    type="url"
+                    value={whatsappUrl}
+                    onChange={(e) => setWhatsappUrl(e.target.value)}
+                    placeholder="https://chat.whatsapp.com/your-group-id"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition focus:border-violet-500/50"
+                  />
+                  <p className="text-[10px] text-slate-500">
+                    Enter the WhatsApp Group invitation URL. Leaving it blank hides the join button from the homepage, match details, and player views.
+                  </p>
+                </label>
+
+                {settingsError && (
+                  <p className="text-xs font-medium text-rose-400 bg-rose-500/5 py-2 px-3 rounded-lg border border-rose-500/10">
+                    {settingsError}
+                  </p>
+                )}
+
+                {settingsSuccess && (
+                  <p className="text-xs font-medium text-emerald-400 bg-emerald-500/5 py-2 px-3 rounded-lg border border-emerald-500/10">
+                    Settings saved successfully!
+                  </p>
+                )}
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="submit"
+                    disabled={isSavingSettings}
+                    className="px-5 py-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-xs font-bold text-white rounded-xl shadow-lg shadow-violet-500/10 active:scale-95 transition-all duration-150 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                  >
+                    {isSavingSettings ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Save className="h-3.5 w-3.5" />
+                    )}
+                    Save Settings
+                  </button>
+                </div>
+              </form>
+            </div>
+          </section>
         )}
 
         {/* Footnote information */}
