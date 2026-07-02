@@ -310,6 +310,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
           autoPlay={autoPlay}
         >
           <MediaProvider />
+          
           <DefaultVideoLayout
             thumbnails={thumbnails}
             icons={defaultLayoutIcons}
@@ -417,6 +418,25 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
               )
             }}
           />
+
+          {/* Broadcast watermark overlay (centered relative to active video texture bounds with z-30) */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30 select-none animate-in fade-in duration-500">
+            <div className={`relative pointer-events-none transition-all duration-350 ${
+              objectFit === "contain"
+                ? "w-full aspect-video max-h-full"
+                : "w-full h-full"
+            }`}>
+              {/* Watermark aligned to the top right of the video bounds */}
+              <div className="absolute top-3 right-1.5 pointer-events-none">
+                <div className="flex items-center gap-2 px-4 py-2 rounded-md bg-black border border-white/10 shadow-md min-w-[120px] justify-center">
+                  <span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse shrink-0" />
+                  <span className="text-[10px] sm:text-xs font-black tracking-widest uppercase text-slate-100 shrink-0">
+                    abc sports
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* Chat Overlay inside the video player (rendered when chat is open and either on mobile or fullscreen) */}
           {playerId && (isMobile || fullscreen || showOverlayChat) && (
