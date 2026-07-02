@@ -3,10 +3,12 @@
 import { MediaPlayer, MediaProvider, isHLSProvider, useMediaPlayer, useMediaStore, type MediaPlayerInstance, type MediaProviderAdapter } from "@vidstack/react";
 import { defaultLayoutIcons, DefaultVideoLayout } from "@vidstack/react/player/layouts/default";
 import { forwardRef, useState, useRef, useImperativeHandle, useEffect } from "react";
-import { MessageSquare, MessageSquareOff, Server, Loader2, Crop, ToggleLeft, ToggleRight, RefreshCw, AlertTriangle } from "lucide-react";
+import { MessageSquare, MessageSquareOff, Server, Loader2, Crop, RefreshCw, AlertTriangle } from "lucide-react";
 import { LiveMatchChat } from "@/components/live-match-chat";
 import { FloatingReactions } from "@/components/floating-reactions";
 import { FloatingChat } from "@/components/floating-chat";
+import { useLiveStreamController } from "@/hooks/use-live-stream-controller";
+import type { StreamServerId } from "@/lib/stream-health";
 
 interface VideoPlayerProps {
   src: string;
@@ -21,9 +23,9 @@ interface VideoPlayerProps {
   onToggleChat?: () => void;
   playerId?: string;
   isMobile?: boolean;
-  servers?: Array<{ id: "1" | "2" | "3" | "4"; name: string }>;
-  activeServerId?: "1" | "2" | "3" | "4" | null;
-  onServerChange?: (id: "1" | "2" | "3" | "4") => void;
+  servers?: Array<{ id: StreamServerId; name: string }>;
+  activeServerId?: StreamServerId | null;
+  onServerChange?: (id: StreamServerId) => void;
   isAutoSwitchEnabled?: boolean;
   isFloatingEnabled?: boolean;
 }
@@ -64,22 +66,14 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
     const [objectFit, setObjectFit] = useState<"contain" | "cover" | "fill">("contain");
     const [isServerMenuOpen, setIsServerMenuOpen] = useState(false);
     const playerRef = useRef<MediaPlayerInstance>(null);
-    const [isGracePeriodActive, setIsGracePeriodActive] = useState(true);
-
-    useEffect(() => {
-      if (activeServerId) {
-        setIsGracePeriodActive(true);
-        const timer = setTimeout(() => {
-          setIsGracePeriodActive(false);
-        }, 15000); // 15 seconds grace period when changing server
-        return () => clearTimeout(timer);
-      }
-    }, [activeServerId]);
 
     useEffect(() => {
       const playerEl = playerRef.current;
       if (playerEl) {
-        const playerElAny = playerEl as any;
+        const playerElAny = playerEl as unknown as {
+          setAttribute?: (name: string, value: string) => void;
+          el?: HTMLElement;
+        };
         if (typeof playerElAny.setAttribute === "function") {
           playerElAny.setAttribute("data-fit", objectFit);
         }
@@ -93,165 +87,68 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
     // Forward the ref to the parent component
     useImperativeHandle(ref, () => playerRef.current!);
 
-    const { fullscreen, waiting, error, playing, canPlay } = useMediaStore(playerRef);
-    const [autoSwitchingTo, setAutoSwitchingTo] = useState<string | null>(null);
-    const [countdown, setCountdown] = useState<number | null>(null);
-    const [nextServerName, setNextServerName] = useState<string | null>(null);
-    const [failedServers, setFailedServers] = useState<Set<string>>(new Set());
-    const [retryCount, setRetryCount] = useState(0);
+    const {
+      fullscreen,
+      waiting,
+      error,
+      playing,
+      canPlay,
+      currentTime,
+      bufferedEnd,
+      seekableEnd,
+    } = useMediaStore(playerRef);
     const [loadingTimeout, setLoadingTimeout] = useState(false);
     const [userClickedShowOverlay, setUserClickedShowOverlay] = useState(false);
 
+    const {
+      allStreamsFailed,
+      autoSwitchingTo,
+      countdown,
+      failedServerIds,
+      finalSrc,
+      handleManualServerChange,
+      handleRefresh,
+      nextServerName,
+      recordHlsError,
+      statusMessage,
+      statusTitle,
+    } = useLiveStreamController({
+      src,
+      playerRef,
+      servers,
+      activeServerId: activeServerId ?? null,
+      onServerChange,
+      isAutoSwitchEnabled,
+      canPlay,
+      waiting,
+      playing,
+      error,
+      currentTime,
+      bufferedEnd,
+      seekableEnd,
+    });
+
     useEffect(() => {
       if (canPlay) {
-        setLoadingTimeout(false);
-        setUserClickedShowOverlay(false);
-        return;
+        const resetTimer = window.setTimeout(() => {
+          setLoadingTimeout(false);
+          setUserClickedShowOverlay(false);
+        }, 0);
+        return () => window.clearTimeout(resetTimer);
       }
 
-      setLoadingTimeout(false);
-      const timer = setTimeout(() => {
+      const resetTimer = window.setTimeout(() => {
+        setLoadingTimeout(false);
+      }, 0);
+      const timer = window.setTimeout(() => {
         setLoadingTimeout(true);
       }, 2500);
 
-      return () => clearTimeout(timer);
-    }, [canPlay, src]);
-
-    const allStreamsFailed = servers.length > 0 && servers.every((s) => failedServers.has(s.id));
-
-    const handleRefresh = () => {
-      setFailedServers(new Set());
-      setCountdown(null);
-      setNextServerName(null);
-      setAutoSwitchingTo(null);
-      setRetryCount((prev) => prev + 1);
-      if (servers.length > 0 && onServerChange) {
-        onServerChange(servers[0].id);
-      }
-    };
-
-    const finalSrc = src
-      ? src.includes("?")
-        ? `${src}&retry=${retryCount}`
-        : `${src}?retry=${retryCount}`
-      : "";
-
-    // Clear failed servers if playback succeeds
-    useEffect(() => {
-      if ((playing || canPlay) && !waiting && !error) {
-        setFailedServers(new Set());
-      }
-    }, [playing, canPlay, waiting, error]);
-
-    // Handle immediate error states
-    useEffect(() => {
-      if (error && activeServerId && servers.length > 0) {
-        // Mark current server as failed
-        setFailedServers((prev) => {
-          if (prev.has(activeServerId)) return prev;
-          const next = new Set(prev);
-          next.add(activeServerId);
-          return next;
-        });
-
-        // Only switch automatically if auto-switching is enabled
-        if (!isAutoSwitchEnabled) return;
-
-        // Switch immediately to next server if we have other servers
-        const allFailed = servers.every((s) => s.id === activeServerId || failedServers.has(s.id));
-        if (!allFailed && onServerChange) {
-          const currentIdx = servers.findIndex((s) => s.id === activeServerId);
-          if (currentIdx !== -1) {
-            const nextIdx = (currentIdx + 1) % servers.length;
-            const nextServer = servers[nextIdx];
-            setAutoSwitchingTo(nextServer.name);
-            onServerChange(nextServer.id);
-            setTimeout(() => {
-              setAutoSwitchingTo(null);
-            }, 4000);
-          }
-        }
-      }
-    }, [error, activeServerId, servers, onServerChange, failedServers, isAutoSwitchEnabled]);
-
-    useEffect(() => {
-      let intervalId: NodeJS.Timeout;
-
-      // If auto-switching is disabled, clear switching states and do nothing
-      if (!isAutoSwitchEnabled) {
-        setCountdown(null);
-        setNextServerName(null);
-        return;
-      }
-
-      // Stall can be either playback buffering (waiting) OR loading taking too long, but only outside the initial grace period
-      const isStalled = !isGracePeriodActive && (waiting || (!canPlay && loadingTimeout)) && !error;
-
-      if (isStalled && activeServerId && servers.length > 0) {
-        const allFailed = servers.every((s) => failedServers.has(s.id));
-        if (allFailed) {
-          return;
-        }
-
-        const currentIdx = servers.findIndex((s) => s.id === activeServerId);
-        if (currentIdx !== -1) {
-          const hasMultiple = servers.length > 1;
-          const nextIdx = hasMultiple ? (currentIdx + 1) % servers.length : -1;
-          const nextServer = nextIdx !== -1 ? servers[nextIdx] : null;
-
-          if (nextServer) {
-            setNextServerName(nextServer.name);
-          }
-
-          let localCountdown = 8; // Give it 8 seconds to buffer/retry before auto-switching
-          setCountdown(localCountdown);
-
-          intervalId = setInterval(() => {
-            localCountdown -= 1;
-            if (localCountdown >= 0) {
-              setCountdown(localCountdown);
-            }
-            if (localCountdown === 0) {
-              clearInterval(intervalId);
-
-              // Mark current server as failed
-              setFailedServers((prev) => {
-                const next = new Set(prev);
-                next.add(activeServerId);
-                return next;
-              });
-
-              // Switch if there is a next server and not all servers failed
-              if (nextServer && onServerChange) {
-                const allFailedAfterThis = servers.every(
-                  (s) => s.id === activeServerId || failedServers.has(s.id)
-                );
-                if (!allFailedAfterThis) {
-                  setAutoSwitchingTo(nextServer.name);
-                  onServerChange(nextServer.id);
-                }
-              }
-
-              setCountdown(null);
-              setNextServerName(null);
-
-              if (nextServer) {
-                setTimeout(() => {
-                  setAutoSwitchingTo(null);
-                }, 4000);
-              }
-            }
-          }, 1000);
-        }
-      } else {
-        setCountdown(null);
-        setNextServerName(null);
-      }
-
       return () => {
-        if (intervalId) clearInterval(intervalId);
+        window.clearTimeout(resetTimer);
+        window.clearTimeout(timer);
       };
-    }, [waiting, canPlay, loadingTimeout, error, servers, activeServerId, onServerChange, failedServers, isAutoSwitchEnabled, isGracePeriodActive]);
+    }, [canPlay, src]);
 
     const toggleFit = () => {
       setObjectFit((prev) => {
@@ -280,6 +177,20 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
           nudgeOffset: 0.2, // If stuck/stalled, nudge playback forward by 0.2s
           nudgeMaxRetry: 5,
         };
+
+        provider.onInstance((hls) => {
+          const hlsAny = hls as unknown as {
+            on?: (event: string, callback: (_event: string, data: unknown) => void) => void;
+            off?: (event: string, callback: (_event: string, data: unknown) => void) => void;
+          };
+
+          const onError = (_event: string, data: unknown) => {
+            recordHlsError(data as { fatal?: boolean; type?: string; details?: string });
+          };
+
+          hlsAny.on?.("hlsError", onError);
+          return () => hlsAny.off?.("hlsError", onError);
+        });
       }
     };
 
@@ -352,13 +263,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                                 key={srv.id}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  // Clear failed status when user manually switches to this server
-                                  setFailedServers((prev) => {
-                                    const next = new Set(prev);
-                                    next.delete(srv.id);
-                                    return next;
-                                  });
-                                  onServerChange(srv.id);
+                                  handleManualServerChange(srv.id);
                                   setIsServerMenuOpen(false);
                                 }}
                                 className={`w-full px-2 py-1.5 text-left text-[11px] font-medium rounded-lg transition-all duration-150 cursor-pointer flex items-center justify-between ${
@@ -486,9 +391,9 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                   <h4 className="text-sm md:text-base font-bold text-slate-200">Slow Connection</h4>
                   <p className="text-xs md:text-sm leading-relaxed text-slate-400">
                     {nextServerName ? (
-                      <>Stream stalled. Switching to <span className="font-semibold text-violet-400">{nextServerName}</span> in <span className="font-bold text-amber-400">{countdown}s</span>...</>
+                      <>Building buffer. Switching to <span className="font-semibold text-violet-400">{nextServerName}</span> in <span className="font-bold text-amber-400">{countdown}s</span> if needed...</>
                     ) : (
-                      <>Stream stalled. Retrying stream in <span className="font-bold text-amber-400">{countdown}s</span>...</>
+                      <>Recovering stream in <span className="font-bold text-amber-400">{countdown}s</span>...</>
                     )}
                   </p>
                 </div>
@@ -526,23 +431,13 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
               </div>
 
               <h3 className="text-base md:text-lg font-bold text-slate-100 mb-2">
-                {allStreamsFailed
-                  ? "All Streams Offline"
-                  : error
-                  ? "Error Loading Stream"
-                  : countdown !== null
-                  ? `Switching Server in ${countdown}s`
-                  : "Connecting to Stream..."}
+                {countdown !== null && !allStreamsFailed
+                  ? `${statusTitle} (${countdown}s)`
+                  : statusTitle}
               </h3>
 
               <p className="text-xs md:text-sm text-slate-400 max-w-sm mb-6 leading-relaxed">
-                {allStreamsFailed
-                  ? "We tried all available stream servers but none of them are responding right now. Please try refreshing or select a different server."
-                  : error
-                  ? "The media player encountered an error loading this source. Please select another server or try refreshing."
-                  : countdown !== null
-                  ? `Stream stalled. Automatically switching to ${nextServerName || "next server"} in ${countdown}s...`
-                  : "The stream is taking longer than usual to load. You can wait a moment, refresh, or switch to an alternative server."}
+                {statusMessage}
               </p>
 
               {/* Server selector buttons directly inside the overlay */}
@@ -557,19 +452,13 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                         key={srv.id}
                         onClick={(e) => {
                           e.stopPropagation();
-                          // Clear failed status when user manually switches to this server
-                          setFailedServers((prev) => {
-                            const next = new Set(prev);
-                            next.delete(srv.id);
-                            return next;
-                          });
-                          if (onServerChange) {
-                            onServerChange(srv.id);
-                          }
+                          handleManualServerChange(srv.id);
                         }}
                         className={`px-3 py-2 text-xs font-semibold rounded-xl border transition-all duration-200 cursor-pointer ${
                           activeServerId === srv.id
                             ? "bg-violet-600 border-violet-500 text-white shadow-lg shadow-violet-600/20"
+                            : failedServerIds.has(srv.id)
+                            ? "bg-rose-950/30 border-rose-500/30 text-rose-200 hover:bg-rose-950/50"
                             : "bg-white/5 border-white/10 text-slate-300 hover:text-white hover:bg-white/10"
                         }`}
                       >
@@ -619,4 +508,3 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
 );
 
 VideoPlayer.displayName = "VideoPlayer";
-
