@@ -110,6 +110,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
       handleRefresh,
       nextServerName,
       recordHlsError,
+      sourceVersion,
       statusMessage,
       statusTitle,
     } = useLiveStreamController({
@@ -161,6 +162,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
 
     const handleProviderChange = (provider: MediaProviderAdapter | null) => {
       if (isHLSProvider(provider)) {
+        provider.library = () => import("hls.js");
         provider.config = {
           liveSyncDuration: 25, // Target sync latency of 25s for slow connections so it can build buffer
           liveMaxLatencyDuration: 50, // Allow up to 50s latency before forcing catch-up
@@ -208,6 +210,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
         className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black/95 border border-white/10 shadow-2xl backdrop-blur-md transition-all duration-300 hover:border-violet-500/30 group"
       >
         <MediaPlayer
+          key={`${finalSrc}:${sourceVersion}`}
           className="w-full h-full select-none outline-none relative"
           title={title}
           src={finalSrc}

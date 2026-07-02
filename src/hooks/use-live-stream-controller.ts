@@ -92,11 +92,7 @@ export function useLiveStreamController({
   const allStreamsFailed =
     servers.length > 0 && servers.every((server) => failedServerIds.has(server.id));
 
-  const finalSrc = useMemo(() => {
-    if (!src) return "";
-    const separator = src.includes("?") ? "&" : "?";
-    return `${src}${separator}retry=${retryCount}`;
-  }, [src, retryCount]);
+  const finalSrc = useMemo(() => src, [src]);
 
   const reportHealthEvent = useCallback(
     (payload: {
@@ -512,6 +508,7 @@ export function useLiveStreamController({
     nextServerName,
     phase,
     recordHlsError,
+    sourceVersion: retryCount,
     statusMessage,
     statusTitle,
   };
