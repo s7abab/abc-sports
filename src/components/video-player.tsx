@@ -331,29 +331,28 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
             }}
           />
 
-          {/* Broadcast watermark overlay (centered relative to active video texture bounds with z-30) */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30 select-none animate-in fade-in duration-500">
-            <div className={`relative pointer-events-none transition-all duration-350 ${
-              objectFit === "contain"
-                ? "w-full aspect-video max-h-full"
-                : "w-full h-full"
-            }`}>
-              {/* Watermark aligned to the top right of the video bounds */}
-              <div className="absolute top-[1%] right-[1%] pointer-events-none">
-                <div className="flex items-center gap-[clamp(4px,0.5vw,8px)] px-[clamp(10px,1.2vw,16px)] py-[clamp(5px,0.8vw,10px)] rounded-[clamp(6px,0.8vw,10px)] bg-slate-950/95 backdrop-blur-md border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.55)] transition-all duration-300 hover:border-violet-500/30">
-                  {/* Brand Logo Mark */}
-                  <div className="w-[clamp(14px,1.5vw,18px)] h-[clamp(14px,1.5vw,18px)] rounded-full bg-gradient-to-tr from-violet-600 to-fuchsia-600 flex items-center justify-center text-[clamp(8px,1vw,10px)] font-black text-white shrink-0 shadow-sm tracking-tighter select-none">
-                    A
+          {/* ABC Sports watermark hidden by request. Change false to true to restore it. */}
+          {false && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 select-none animate-in fade-in duration-500">
+              <div className={`relative pointer-events-none transition-all duration-350 ${
+                objectFit === "contain"
+                  ? "w-full aspect-video max-h-full"
+                  : "w-full h-full"
+              }`}>
+                <div className="absolute top-[1%] right-[1%] pointer-events-none">
+                  <div className="flex items-center gap-[clamp(4px,0.5vw,8px)] px-[clamp(10px,1.2vw,16px)] py-[clamp(5px,0.8vw,10px)] rounded-[clamp(6px,0.8vw,10px)] bg-slate-950/95 backdrop-blur-md border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.55)] transition-all duration-300 hover:border-violet-500/30">
+                    <div className="w-[clamp(14px,1.5vw,18px)] h-[clamp(14px,1.5vw,18px)] rounded-full bg-gradient-to-tr from-violet-600 to-fuchsia-600 flex items-center justify-center text-[clamp(8px,1vw,10px)] font-black text-white shrink-0 shadow-sm tracking-tighter select-none">
+                      A
+                    </div>
+                    <span className="text-[clamp(10px,1.2vw,14px)] font-black tracking-widest uppercase shrink-0 select-none">
+                      <span className="text-slate-100">abc</span>{" "}
+                      <span className="text-violet-400">sports</span>
+                    </span>
                   </div>
-                  {/* Brand Typography */}
-                  <span className="text-[clamp(10px,1.2vw,14px)] font-black tracking-widest uppercase shrink-0 select-none">
-                    <span className="text-slate-100">abc</span>{" "}
-                    <span className="text-violet-400">sports</span>
-                  </span>
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Chat Overlay inside the video player (rendered when chat is open and either on mobile or fullscreen) */}
           {playerId && showOverlayChat && (
