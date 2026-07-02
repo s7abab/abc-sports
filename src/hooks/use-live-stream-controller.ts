@@ -195,16 +195,18 @@ export function useLiveStreamController({
 
   const switchToBestServer = useCallback(
     (reason: "error" | "stall" | "hls") => {
-      if (!activeServerId || !onServerChange || !isAutoSwitchEnabled) return false;
+      if (!activeServerId || !onServerChange || !isAutoSwitchEnabled || servers.length < 2) {
+        return false;
+      }
 
       const now = Date.now();
-      const canSwitch =
-        reason === "error" ||
-        reason === "hls" ||
-        (now - srcStartedAtRef.current >= STREAM_HEALTH_TARGETS.minimumWatchBeforeSwitchMs &&
-          now >= manualLockUntilRef.current);
+      const watchedLongEnough =
+        now - srcStartedAtRef.current >= STREAM_HEALTH_TARGETS.minimumWatchBeforeSwitchMs;
+      const manualLockExpired = now >= manualLockUntilRef.current;
 
-      if (!canSwitch || now - lastSwitchAtRef.current < 4_000) return false;
+      if (!watchedLongEnough || !manualLockExpired || now - lastSwitchAtRef.current < 15_000) {
+        return false;
+      }
 
       const nextServer = getNextHealthyServer(
         servers,
@@ -268,15 +270,21 @@ export function useLiveStreamController({
 
       hlsFailureBurstRef.current += 1;
       const isFatal = Boolean(event.fatal);
-      const penalty = isFatal ? -35 : -8;
+      const penalty = isFatal ? -35 : -2;
 
       updateScore(activeServerId, penalty);
 
-      if (isFatal || hlsFailureBurstRef.current >= 4) {
-        markServerFailed(activeServerId, isFatal ? -35 : -18);
+      if (isFatal) {
+        markServerFailed(activeServerId, -35);
         if (!switchToBestServer("hls")) {
           setRetryCount((prev) => prev + 1);
         }
+        return;
+      }
+
+      if (hlsFailureBurstRef.current >= 8 && !reloadedDuringStallRef.current) {
+        reloadedDuringStallRef.current = true;
+        setRetryCount((prev) => prev + 1);
       }
     },
     [activeServerId, markServerFailed, switchToBestServer, updateScore]
@@ -347,7 +355,7 @@ export function useLiveStreamController({
       const startupAge = now - srcStartedAtRef.current;
       const stalled =
         Boolean(error) ||
-        waiting ||
+        (waiting && canPlay && bufferAhead < STREAM_HEALTH_TARGETS.minimumPlayableBuffer) ||
         (!canPlay && startupAge > STREAM_HEALTH_TARGETS.startupGraceMs) ||
         (canPlay && bufferAhead < STREAM_HEALTH_TARGETS.degradedBufferThreshold);
 

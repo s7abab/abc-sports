@@ -37,11 +37,11 @@ export const STREAM_HEALTH_TARGETS = {
   maxLiveLatency: 75,
   catchupLatency: 45,
   catchupRate: 1.04,
-  switchAfterStallMs: 16_000,
-  reloadAfterStallMs: 8_000,
-  minimumWatchBeforeSwitchMs: 20_000,
-  serverCooldownMs: 60_000,
-  manualSelectionLockMs: 30_000,
+  switchAfterStallMs: 30_000,
+  reloadAfterStallMs: 12_000,
+  minimumWatchBeforeSwitchMs: 45_000,
+  serverCooldownMs: 120_000,
+  manualSelectionLockMs: 120_000,
   healthyRewardIntervalMs: 30_000,
 } as const;
 
@@ -91,9 +91,5 @@ export function getNextHealthyServer(
     })
     .sort((a, b) => b.health.score - a.health.score);
 
-  return (
-    candidates.find((candidate) => !candidate.coolingDown)?.server ??
-    candidates[0]?.server ??
-    null
-  );
+  return candidates.find((candidate) => !candidate.coolingDown)?.server ?? null;
 }
