@@ -10,6 +10,52 @@ const CHAT_SOCKET_PATH = "/api/chat/socket";
 const MAX_BODY_LENGTH = 280;
 const MAX_AUTHOR_LENGTH = 28;
 const MAX_ROOM_MESSAGES = 400;
+const BLOCKED_WORDS = [
+  "fuck",
+  "shit",
+  "bitch",
+  "asshole",
+  "kill yourself",
+  "nigger",
+  "chink",
+  "paki",
+  "മൈര്",
+  "മയിര്",
+  "പുണ്ട",
+  "പൂണ്ട",
+  "തായോളി",
+  "തായോലി",
+  "കുണ്ണ",
+  "കൂണ്ണ",
+  "പൂറ്",
+  "പൂർ",
+  "പട്ടി",
+  "നായിന്റെ മോൻ",
+  "നായിന്റെമോൻ",
+  "പൊലയാടി",
+  "പൊലയാടിമോൻ",
+  "വേശ്യ",
+  "കഴുവേറി",
+  "കഴുവേറിയ",
+  "myre",
+  "myr",
+  "mayir",
+  "maire",
+  "punda",
+  "poonda",
+  "thayoli",
+  "tayoli",
+  "kunna",
+  "koonna",
+  "poor",
+  "patti",
+  "nayinte mon",
+  "nayintemon",
+  "polayadi",
+  "polayadi mon",
+  "veshya",
+  "kazhuveri",
+];
 
 const rooms = new Map();
 let supabase = null;
@@ -53,6 +99,94 @@ function normalizeBody(value) {
 
 function normalizeKind(value) {
   return value === "reaction" ? "reaction" : "message";
+}
+
+function normalizeClientId(value) {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const clientId = value.trim().slice(0, 80);
+  return clientId || undefined;
+}
+
+function heuristicModerateChat(input) {
+  if (normalizeKind(input.kind) === "reaction") {
+    return { allowed: true, reason: "Reactions are allowlisted.", category: "ok" };
+  }
+
+  const normalized = normalizeBody(input.body)
+    .toLowerCase()
+    .normalize("NFKC")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const compact = normalized.replace(/\s+/g, "");
+  const hasLink = /https?:\/\/|www\.|t\.me\/|wa\.me\/|bit\.ly|discord\.gg/i.test(normalized);
+  const repeatedChars = /(.)\1{8,}/.test(normalized);
+  const blockedWord = BLOCKED_WORDS.find((word) => {
+    const normalizedWord = word.toLowerCase().normalize("NFKC");
+    return normalized.includes(normalizedWord) || compact.includes(normalizedWord.replace(/\s+/g, ""));
+  });
+
+  if (hasLink) return { allowed: false, reason: "Links are blocked in live chat.", category: "link" };
+  if (blockedWord) return { allowed: false, reason: "Abusive language is blocked.", category: "abuse" };
+  if (repeatedChars) return { allowed: false, reason: "Repeated spam is blocked.", category: "spam" };
+
+  return { allowed: true, reason: "Passed local moderation.", category: "ok" };
+}
+
+function parseJsonObject(value, fallback) {
+  try {
+    const match = value.match(/\{[\s\S]*\}/);
+    return JSON.parse(match?.[0] || value);
+  } catch {
+    return fallback;
+  }
+}
+
+async function moderateChatMessage(input) {
+  const heuristic = heuristicModerateChat(input);
+  if (!heuristic.allowed || !process.env.OPENROUTER_API_KEY) {
+    return heuristic;
+  }
+
+  try {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+        "X-Title": "ABC Sports",
+      },
+      body: JSON.stringify({
+        model: process.env.OPENROUTER_MODEL || "google/gemini-2.5-flash",
+        temperature: 0,
+        max_tokens: 120,
+        messages: [
+          {
+            role: "system",
+            content:
+              "Moderate a sports live chat message. Return only JSON: {\"allowed\":boolean,\"category\":\"ok|spam|abuse|link|unsafe\",\"reason\":\"short user-safe reason\"}. Block hate, harassment, sexual content, threats, scams, spam, and external links. Allow normal football banter.",
+          },
+          {
+            role: "user",
+            content: JSON.stringify({
+              author: normalizeAuthor(input.author),
+              body: normalizeBody(input.body),
+            }),
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) return heuristic;
+    const data = await response.json();
+    return parseJsonObject(data?.choices?.[0]?.message?.content || "", heuristic);
+  } catch {
+    return heuristic;
+  }
 }
 
 async function pruneRoom(playerId) {
@@ -290,9 +424,21 @@ async function handleChatUpgrade(req, socket) {
           continue;
         }
 
+        const moderation = await moderateChatMessage(payload);
+        if (!moderation.allowed) {
+          sendJson(socket, { type: "error", error: moderation.reason });
+          continue;
+        }
+
         const message = await createChatMessage(playerId, payload);
         if (message) {
-          broadcast(playerId, { type: "message", message });
+          broadcast(playerId, {
+            type: "message",
+            message: {
+              ...message,
+              clientId: normalizeClientId(payload.clientId),
+            },
+          });
         }
       } catch {
         sendJson(socket, { type: "error", error: "Message not sent." });

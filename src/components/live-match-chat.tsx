@@ -1,9 +1,11 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { AtSign, MessageCircle, Send, Smile, UserRound, X } from "lucide-react";
+import { AtSign, MessageCircle, Send, Smile, X } from "lucide-react";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 import type { ChatMessage } from "@/lib/chat-storage";
+import { createClient } from "@/utils/supabase/client";
 
 interface LiveMatchChatProps {
   playerId: string;
@@ -14,6 +16,27 @@ interface LiveMatchChatProps {
 
 const QUICK_REACTIONS = ["🔥", "👏", "⚽", "😱", "❤️"];
 const MAX_NAME_LENGTH = 28;
+const MAX_RENDERED_MESSAGES = 160;
+const CHAT_BROADCAST_EVENT = "chat-message";
+const LOCAL_ECHO_TTL_MS = 8_000;
+
+type ChatSocketMessage = ChatMessage & {
+  clientId?: string;
+};
+
+type LocalChatMessage = ChatMessage & {
+  clientId?: string;
+  deliveryStatus?: "sending" | "sent" | "failed";
+};
+
+type ChatMessageRow = {
+  id: string;
+  player_id: string;
+  author: string;
+  body: string;
+  kind: string;
+  created_at: string;
+};
 
 function formatMessageTime(value: string) {
   const date = new Date(value);
@@ -31,15 +54,60 @@ function normalizeDisplayName(value: string) {
   return value.replace(/\s+/g, " ").trim().slice(0, MAX_NAME_LENGTH);
 }
 
-function mergeMessages(current: ChatMessage[], incoming: ChatMessage[]) {
-  const byId = new Map<string, ChatMessage>();
-  [...current, ...incoming].forEach((message) => {
-    byId.set(message.id, message);
+function mergeMessages(current: LocalChatMessage[], incoming: LocalChatMessage[]) {
+  if (incoming.length === 0) {
+    return current;
+  }
+
+  const seenIds = new Set(current.map((message) => message.id));
+  let next = current;
+  let needsSort = false;
+  let latestTime = current.at(-1)?.createdAt ?? "";
+
+  incoming.forEach((message) => {
+    if (seenIds.has(message.id)) {
+      return;
+    }
+
+    seenIds.add(message.id);
+    next = next === current ? [...current, message] : [...next, message];
+
+    if (latestTime && message.createdAt < latestTime) {
+      needsSort = true;
+    }
+    if (!latestTime || message.createdAt > latestTime) {
+      latestTime = message.createdAt;
+    }
   });
 
-  return [...byId.values()].sort(
-    (first, second) => new Date(first.createdAt).getTime() - new Date(second.createdAt).getTime()
-  );
+  if (next === current) {
+    return current;
+  }
+
+  if (needsSort) {
+    next.sort((first, second) => first.createdAt.localeCompare(second.createdAt));
+  }
+
+  return next.slice(-MAX_RENDERED_MESSAGES);
+}
+
+function replaceOptimisticMessage(
+  current: LocalChatMessage[],
+  clientId: string | undefined,
+  message: LocalChatMessage
+) {
+  if (!clientId) {
+    return mergeMessages(current, [message]);
+  }
+
+  const index = current.findIndex((item) => item.clientId === clientId);
+  if (index === -1) {
+    return mergeMessages(current, [message]);
+  }
+
+  const next = [...current];
+  next[index] = { ...message, clientId, deliveryStatus: "sent" };
+  return mergeMessages([], next);
 }
 
 function getActiveMentionQuery(value: string) {
@@ -63,23 +131,71 @@ function renderMessageBody(body: string) {
   });
 }
 
+function emitChatEvent(message: ChatMessage) {
+  if (message.kind === "reaction") {
+    window.dispatchEvent(
+      new CustomEvent("live-chat-reaction", {
+        detail: { id: message.id, emoji: message.body },
+      })
+    );
+    return;
+  }
+
+  window.dispatchEvent(
+    new CustomEvent("live-chat-comment", {
+      detail: { id: message.id, author: message.author, body: message.body },
+    })
+  );
+}
+
+function mapChatRow(row: ChatMessageRow): ChatMessage {
+  return {
+    id: row.id,
+    playerId: row.player_id,
+    author: row.author,
+    body: row.body,
+    kind: row.kind === "reaction" ? "reaction" : "message",
+    createdAt: new Date(row.created_at).toISOString(),
+  };
+}
+
+function getMessageSignature(message: Pick<ChatMessage, "author" | "body" | "kind" | "playerId">) {
+  return [
+    message.playerId,
+    normalizeDisplayName(message.author).toLowerCase(),
+    message.kind,
+    message.body.trim().toLowerCase(),
+  ].join("|");
+}
+
 export function LiveMatchChat({ playerId, roomTitle, isOverlay = false, onClose }: LiveMatchChatProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<LocalChatMessage[]>([]);
   const [messageText, setMessageText] = useState("");
   const [viewerName, setViewerName] = useState("");
   const [nameInput, setNameInput] = useState("");
   const [hasSetName, setHasSetName] = useState(false);
 
   useEffect(() => {
-    const savedName = localStorage.getItem("chat_viewer_name");
-    if (savedName) {
-      const normalized = normalizeDisplayName(savedName);
-      if (normalized) {
-        setViewerName(normalized);
-        setNameInput(normalized);
-        setHasSetName(true);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) {
+        return;
       }
-    }
+
+      const savedName = localStorage.getItem("chat_viewer_name");
+      if (savedName) {
+        const normalized = normalizeDisplayName(savedName);
+        if (normalized) {
+          setViewerName(normalized);
+          setNameInput(normalized);
+          setHasSetName(true);
+        }
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const [isSending, setIsSending] = useState(false);
@@ -87,35 +203,15 @@ export function LiveMatchChat({ playerId, roomTitle, isOverlay = false, onClose 
   const [isSocketLive, setIsSocketLive] = useState(false);
   const [error, setError] = useState("");
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const socketRef = useRef<WebSocket | null>(null);
-  const latestMessageTimeRef = useRef("");
-  const lastReactionSentRef = useRef<number>(0);
-
-  const [isFloatingEnabled, setIsFloatingEnabled] = useState(false);
-
-  useEffect(() => {
-    const stored = localStorage.getItem("live_chat_float_enabled");
-    setIsFloatingEnabled(stored === "true");
-
-    const handleToggle = (event: Event) => {
-      const customEvent = event as CustomEvent<{ enabled: boolean }>;
-      setIsFloatingEnabled(customEvent.detail.enabled);
-    };
-
-    window.addEventListener("live-chat-float-toggled", handleToggle);
-    return () => {
-      window.removeEventListener("live-chat-float-toggled", handleToggle);
-    };
-  }, []);
-
-  const toggleFloating = () => {
-    const nextState = !isFloatingEnabled;
-    setIsFloatingEnabled(nextState);
-    localStorage.setItem("live_chat_float_enabled", nextState ? "true" : "false");
-    window.dispatchEvent(
-      new CustomEvent("live-chat-float-toggled", { detail: { enabled: nextState } })
-    );
-  };
+  const isNearBottomRef = useRef(true);
+  const isReactionThrottledRef = useRef(false);
+  const localMessageCounterRef = useRef(0);
+  const localEchoIdsRef = useRef(new Set<string>());
+  const localEchoSignaturesRef = useRef(new Set<string>());
+  const messageIdsRef = useRef(new Set<string>());
+  const latestMessageTimeRef = useRef<string | null>(null);
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const isRealtimeSubscribedRef = useRef(false);
 
   const knownUsers = useMemo(() => {
     const users = new Set<string>();
@@ -142,110 +238,41 @@ export function LiveMatchChat({ playerId, roomTitle, isOverlay = false, onClose 
 
   useEffect(() => {
     let cancelled = false;
-    let reconnectTimer: number | undefined;
+    messageIdsRef.current = new Set();
+    latestMessageTimeRef.current = null;
 
-    function connect() {
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const socket = new WebSocket(
-        `${protocol}//${window.location.host}/api/chat/socket?playerId=${encodeURIComponent(playerId)}`
-      );
-
-      socketRef.current = socket;
-
-      socket.addEventListener("open", () => {
-        if (cancelled) {
-          socket.close();
-          return;
-        }
-        console.log(`[WebSocket] Connected successfully to chat room: ${playerId}`);
-        setIsSocketLive(true);
-        setError("");
-      });
-
-      socket.addEventListener("message", (event) => {
-        try {
-          const payload = JSON.parse(event.data) as {
-            type?: string;
-            messages?: ChatMessage[];
-            message?: ChatMessage;
-            error?: string;
-          };
-
-          if (payload.type === "history" && Array.isArray(payload.messages)) {
-            setMessages((current) => mergeMessages(current, payload.messages ?? []));
-          }
-
-          if (payload.type === "message" && payload.message) {
-            setMessages((current) => mergeMessages(current, [payload.message as ChatMessage]));
-            if (payload.message.kind === "reaction") {
-              console.log(`[WebSocket] Received reaction message: ${payload.message.body} (id: ${payload.message.id})`);
-              window.dispatchEvent(
-                new CustomEvent("live-chat-reaction", {
-                  detail: { id: payload.message.id, emoji: payload.message.body },
-                })
-              );
-            } else {
-              window.dispatchEvent(
-                new CustomEvent("live-chat-comment", {
-                  detail: { id: payload.message.id, author: payload.message.author, body: payload.message.body },
-                })
-              );
-            }
-          }
-
-          if (payload.type === "error" && payload.error) {
-            setError(payload.error);
-          }
-        } catch {
-          setError("Chat received an invalid update.");
-        }
-      });
-
-      socket.addEventListener("close", () => {
-        if (cancelled) {
-          return;
-        }
-        console.log(`[WebSocket] Disconnected from chat room: ${playerId}, retrying connect...`);
-        setIsSocketLive(false);
-        setError("");
-        reconnectTimer = window.setTimeout(connect, 1500);
-      });
-
-      socket.addEventListener("error", () => {
-        setIsSocketLive(false);
-        setError("");
-      });
-    }
-
-    connect();
-
-    return () => {
-      cancelled = true;
-      if (reconnectTimer) {
-        window.clearTimeout(reconnectTimer);
+    function isLocalEcho(message: ChatMessage) {
+      const signature = getMessageSignature(message);
+      if (!localEchoSignaturesRef.current.has(signature)) {
+        return false;
       }
-      socketRef.current?.close();
-    };
-  }, [playerId]);
 
-  useEffect(() => {
-    latestMessageTimeRef.current = messages.at(-1)?.createdAt ?? "";
-  }, [messages]);
-
-  useEffect(() => {
-    if (isSocketLive) {
-      return;
+      localEchoSignaturesRef.current.delete(signature);
+      return true;
     }
 
-    let cancelled = false;
+    function acceptIncoming(message: ChatMessage, options: { emit?: boolean } = {}) {
+      const isKnown = messageIdsRef.current.has(message.id);
+      const shouldSuppressEcho = !isKnown && isLocalEcho(message);
+      messageIdsRef.current.add(message.id);
+      latestMessageTimeRef.current =
+        !latestMessageTimeRef.current || message.createdAt > latestMessageTimeRef.current
+          ? message.createdAt
+          : latestMessageTimeRef.current;
+      setMessages((current) => mergeMessages(current, [{ ...message, deliveryStatus: "sent" }]));
+      if (!isKnown && options.emit && !shouldSuppressEcho) {
+        emitChatEvent(message);
+      }
+    }
 
-    async function fetchMessages() {
+    async function fetchSnapshot(after?: string | null) {
       try {
-        const after = latestMessageTimeRef.current;
-        const params = after ? `?after=${encodeURIComponent(after)}` : "";
-        const response = await fetch(`/api/chat/${encodeURIComponent(playerId)}${params}`, {
-          cache: "no-store",
-        });
+        const url = new URL(`/api/chat/${encodeURIComponent(playerId)}`, window.location.origin);
+        if (after) {
+          url.searchParams.set("after", after);
+        }
+
+        const response = await fetch(url, { cache: "no-store" });
 
         if (!response.ok) {
           throw new Error("Failed to load chat.");
@@ -253,88 +280,149 @@ export function LiveMatchChat({ playerId, roomTitle, isOverlay = false, onClose 
 
         const data = (await response.json()) as { messages?: ChatMessage[] };
         if (!cancelled && Array.isArray(data.messages)) {
-          const incoming = data.messages ?? [];
-          setMessages((current) => {
-            const currentIds = new Set(current.map((m) => m.id));
-            incoming.forEach((msg) => {
-              if (!currentIds.has(msg.id)) {
-                if (msg.kind === "reaction") {
-                  console.log(`[Polling] Received new reaction message: ${msg.body} (id: ${msg.id})`);
-                  window.dispatchEvent(
-                    new CustomEvent("live-chat-reaction", {
-                      detail: { id: msg.id, emoji: msg.body },
-                    })
-                  );
-                } else {
-                  window.dispatchEvent(
-                    new CustomEvent("live-chat-comment", {
-                      detail: { id: msg.id, author: msg.author, body: msg.body },
-                    })
-                  );
-                }
-              }
-            });
-            return mergeMessages(current, incoming);
-          });
+          data.messages.forEach((message) => acceptIncoming(message, { emit: Boolean(after) }));
         }
       } catch {
         if (!cancelled) {
-          setError("Chat sync is retrying...");
+          setError("Chat history is unavailable.");
         }
       }
     }
 
-    fetchMessages();
-    const interval = window.setInterval(fetchMessages, 2000);
+    void fetchSnapshot();
+
+    const channelName = `live-chat:${playerId}`;
+    const supabase = createClient();
+    const realtimeTopic = `realtime:${channelName}`;
+    supabase
+      .getChannels()
+      .filter((existingChannel) => existingChannel.topic === realtimeTopic)
+      .forEach((existingChannel) => {
+        void supabase.removeChannel(existingChannel);
+      });
+
+    const channel = supabase
+      .channel(channelName)
+      .on("broadcast", { event: CHAT_BROADCAST_EVENT }, (payload) => {
+        const message = (payload.payload as { message?: ChatMessage }).message;
+        if (!message) {
+          return;
+        }
+
+        acceptIncoming(message, { emit: true });
+      })
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "chat_messages",
+          filter: `player_id=eq.${playerId}`,
+        },
+        (payload) => {
+          acceptIncoming(mapChatRow(payload.new as ChatMessageRow), { emit: true });
+        }
+      )
+      .subscribe((status) => {
+        if (cancelled) {
+          return;
+        }
+
+        const isSubscribed = status === "SUBSCRIBED";
+        isRealtimeSubscribedRef.current = isSubscribed;
+        setIsSocketLive(isSubscribed);
+        if (isSubscribed) {
+          setError("");
+        }
+      });
+    channelRef.current = channel;
 
     return () => {
       cancelled = true;
-      window.clearInterval(interval);
+      isRealtimeSubscribedRef.current = false;
+      if (channelRef.current === channel) {
+        channelRef.current = null;
+      }
+      void supabase.removeChannel(channel);
     };
-  }, [isSocketLive, playerId]);
+  }, [playerId]);
 
   useEffect(() => {
+    const container = scrollRef.current;
+    if (!container || !isNearBottomRef.current) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+    });
+  }, [messages.length]);
+
+  function handleScroll() {
     const container = scrollRef.current;
     if (!container) {
       return;
     }
 
-    container.scrollTop = container.scrollHeight;
-  }, [messages.length]);
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    isNearBottomRef.current = distanceFromBottom < 96;
+  }
 
   async function sendMessage(body: string, kind: ChatMessage["kind"] = "message") {
     const trimmedBody = body.trim();
-    if (!trimmedBody || isSending) {
+    if (!trimmedBody || (isSending && kind !== "reaction")) {
       return;
     }
 
+    localMessageCounterRef.current += 1;
+    const clientId = `${kind}-${localMessageCounterRef.current}`;
+    const optimisticMessage: LocalChatMessage = {
+      id: `pending-${clientId}`,
+      playerId,
+      author: viewerName,
+      body: trimmedBody,
+      kind,
+      createdAt: new Date().toISOString(),
+      clientId,
+      deliveryStatus: "sending",
+    };
+    const localEchoSignature = getMessageSignature(optimisticMessage);
+    localEchoSignaturesRef.current.add(localEchoSignature);
+    window.setTimeout(() => {
+      localEchoSignaturesRef.current.delete(localEchoSignature);
+    }, LOCAL_ECHO_TTL_MS);
+
     if (kind === "reaction") {
-      const now = Date.now();
-      if (now - lastReactionSentRef.current < 450) {
+      if (isReactionThrottledRef.current) {
         console.log(`[Reaction] Sender throttled reaction: ${trimmedBody}`);
         return;
       }
-      lastReactionSentRef.current = now;
+      isReactionThrottledRef.current = true;
+      window.setTimeout(() => {
+        isReactionThrottledRef.current = false;
+      }, 450);
+      localEchoIdsRef.current.add(clientId);
+      window.setTimeout(() => localEchoIdsRef.current.delete(clientId), 5000);
+      window.dispatchEvent(
+        new CustomEvent("live-chat-reaction", {
+          detail: { id: clientId, emoji: trimmedBody },
+        })
+      );
     }
 
-    setIsSending(true);
+    isNearBottomRef.current = true;
+    setMessages((current) => mergeMessages(current, [optimisticMessage]));
+    if (kind !== "reaction") {
+      emitChatEvent(optimisticMessage);
+    }
+
+    if (kind === "message") {
+      setIsSending(true);
+      setMessageText("");
+    }
     setError("");
 
     try {
-      const socketPayload = JSON.stringify({
-        type: "message",
-        author: viewerName,
-        body: trimmedBody,
-        kind,
-      });
-
-      const socket = socketRef.current;
-      if (socket?.readyState === WebSocket.OPEN) {
-        socket.send(socketPayload);
-        setMessageText("");
-        return;
-      }
-
       const response = await fetch(`/api/chat/${encodeURIComponent(playerId)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -342,34 +430,50 @@ export function LiveMatchChat({ playerId, roomTitle, isOverlay = false, onClose 
           author: viewerName,
           body: trimmedBody,
           kind,
+          clientId,
         }),
       });
 
-      const data = (await response.json()) as { message?: ChatMessage; error?: string };
+      const data = (await response.json()) as { message?: ChatSocketMessage; error?: string };
       if (!response.ok || !data.message) {
         throw new Error(data.error || "Failed to send message.");
       }
 
-      setMessages((current) => mergeMessages(current, [data.message as ChatMessage]));
-      if (data.message.kind === "reaction") {
-        console.log(`[POST Fallback] Sent and received reaction message: ${data.message.body} (id: ${data.message.id})`);
-        window.dispatchEvent(
-          new CustomEvent("live-chat-reaction", {
-            detail: { id: data.message.id, emoji: data.message.body },
-          })
-        );
-      } else {
-        window.dispatchEvent(
-          new CustomEvent("live-chat-comment", {
-            detail: { id: data.message.id, author: data.message.author, body: data.message.body },
-          })
-        );
+      messageIdsRef.current.add(data.message.id);
+      latestMessageTimeRef.current =
+        !latestMessageTimeRef.current || data.message.createdAt > latestMessageTimeRef.current
+          ? data.message.createdAt
+          : latestMessageTimeRef.current;
+      setMessages((current) =>
+        replaceOptimisticMessage(current, data.message?.clientId, data.message as LocalChatMessage)
+      );
+      if (data.message.clientId && localEchoIdsRef.current.has(data.message.clientId)) {
+        localEchoIdsRef.current.delete(data.message.clientId);
       }
-      setMessageText("");
+      const channel = channelRef.current;
+      if (channel) {
+        const payload = { message: data.message };
+        if (isRealtimeSubscribedRef.current) {
+          void channel.send({
+            type: "broadcast",
+            event: CHAT_BROADCAST_EVENT,
+            payload,
+          });
+        } else {
+          void channel.httpSend(CHAT_BROADCAST_EVENT, payload);
+        }
+      }
     } catch {
       setError("Message not sent. Try again.");
+      setMessages((current) =>
+        current.map((message) =>
+          message.clientId === clientId ? { ...message, deliveryStatus: "failed" } : message
+        )
+      );
     } finally {
-      setIsSending(false);
+      if (kind === "message") {
+        setIsSending(false);
+      }
     }
   }
 
@@ -414,7 +518,7 @@ export function LiveMatchChat({ playerId, roomTitle, isOverlay = false, onClose 
         <div className="flex min-w-0 items-center gap-1.5">
           <MessageCircle className="h-4.5 w-4.5 text-emerald-400 shrink-0" />
           <div className="min-w-0 flex items-center gap-1.5 flex-wrap">
-            <h2 className="truncate font-black text-xs uppercase tracking-wider text-white">
+            <h2 className="truncate font-black text-xs uppercase tracking-wider text-white" title={roomTitle}>
               Chat
             </h2>
             {hasSetName && (
@@ -466,7 +570,11 @@ export function LiveMatchChat({ playerId, roomTitle, isOverlay = false, onClose 
         </div>
       )}
 
-      <div ref={scrollRef} className={`min-h-0 flex-1 overflow-y-auto ${isOverlay ? "space-y-2 px-3 py-2" : "space-y-3 px-4 py-4"}`}>
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className={`min-h-0 flex-1 overflow-y-auto ${isOverlay ? "space-y-2 px-3 py-2" : "space-y-3 px-4 py-4"}`}
+      >
         {messages.length === 0 ? (
           <div className="grid h-full place-items-center text-center">
             <div>
@@ -482,18 +590,23 @@ export function LiveMatchChat({ playerId, roomTitle, isOverlay = false, onClose 
               className={`border ${
                 isOverlay ? "rounded-xl px-2.5 py-1.5" : "rounded-2xl px-3 py-2"
               } ${
+                message.deliveryStatus === "failed"
+                  ? "border-rose-300/25 bg-rose-400/[0.08]"
+                  :
                 message.kind === "reaction"
                   ? "border-emerald-300/20 bg-emerald-300/[0.08]"
                   : "border-white/8 bg-white/[0.055]"
-              }`}
+              } transition will-change-transform animate-[chatMessageIn_180ms_ease-out]`}
             >
               <div className="flex items-center justify-between gap-2">
                 <p className={`min-w-0 truncate font-black text-emerald-100 ${isOverlay ? "text-[11px]" : "text-xs"}`}>
                   {message.author}
                 </p>
-                <time className={`shrink-0 font-semibold text-slate-500 ${isOverlay ? "text-[9px]" : "text-[10px]"}`}>
-                  {formatMessageTime(message.createdAt)}
-                </time>
+                <div className={`flex shrink-0 items-center gap-1 font-semibold text-slate-500 ${isOverlay ? "text-[9px]" : "text-[10px]"}`}>
+                  {message.deliveryStatus === "sending" ? <span className="text-emerald-200/70">Sending</span> : null}
+                  {message.deliveryStatus === "failed" ? <span className="text-rose-200">Failed</span> : null}
+                  <time>{formatMessageTime(message.createdAt)}</time>
+                </div>
               </div>
               <p
                 className={`break-words ${
@@ -571,7 +684,7 @@ export function LiveMatchChat({ playerId, roomTitle, isOverlay = false, onClose 
               ref={nameInputRef}
               type="text"
               value={nameInput}
-              onChange={(e) => setNameInput(e.target.value)}
+              onChange={(e) => handleNameChange(e.target.value)}
               maxLength={MAX_NAME_LENGTH}
               placeholder="Enter name to start chatting..."
               className={`min-w-0 flex-1 rounded-xl border border-white/10 bg-black/30 outline-none transition placeholder:text-slate-500 focus:border-emerald-200/45 ${
@@ -619,4 +732,3 @@ export function LiveMatchChat({ playerId, roomTitle, isOverlay = false, onClose 
     </aside>
   );
 }
-

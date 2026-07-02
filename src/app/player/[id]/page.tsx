@@ -36,22 +36,20 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [whatsappUrl, setWhatsappUrl] = useState("");
   const isMobile = useIsMobile();
-  const [isAutoSwitchEnabled, setIsAutoSwitchEnabled] = useState<boolean>(true);
-  const [isFloatingEnabled, setIsFloatingEnabled] = useState<boolean>(false);
-
-  useEffect(() => {
-    const stored = localStorage.getItem("auto_switch_server_enabled");
-    if (stored !== null) {
-      setIsAutoSwitchEnabled(stored === "true");
+  const [isAutoSwitchEnabled, setIsAutoSwitchEnabled] = useState<boolean>(() => {
+    if (typeof window === "undefined") {
+      return true;
     }
-  }, []);
 
-  useEffect(() => {
-    const stored = localStorage.getItem("live_chat_float_enabled");
-    if (stored !== null) {
-      setIsFloatingEnabled(stored === "true");
+    return localStorage.getItem("auto_switch_server_enabled") !== "false";
+  });
+  const [isFloatingEnabled, setIsFloatingEnabled] = useState<boolean>(() => {
+    if (typeof window === "undefined") {
+      return false;
     }
-  }, []);
+
+    return localStorage.getItem("live_chat_float_enabled") === "true";
+  });
 
   const toggleAutoSwitch = () => {
     const next = !isAutoSwitchEnabled;
@@ -275,10 +273,12 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
               </button>
             </div>
 
-            {/* Bottom Chat: Always visible on all screen sizes below player & controls */}
-            <div className="w-full">
-              <LiveMatchChat playerId={playerId} roomTitle={player.name} />
-            </div>
+            {/* Bottom Chat: visible when the overlay/side chat is closed */}
+            {!isChatOpen && (
+              <div className="w-full">
+                <LiveMatchChat playerId={playerId} roomTitle={player.name} />
+              </div>
+            )}
           </div>
         ) : (
           <div className="aspect-video w-full rounded-2xl bg-black/40 border border-dashed border-white/5 flex flex-col items-center justify-center p-6 text-center select-none text-slate-500">

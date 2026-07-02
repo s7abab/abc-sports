@@ -45,6 +45,17 @@ body {
   color: #ffffff;
 }
 
+@keyframes chatMessageIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Custom HLS Video Object-Fit Overrides */
 media-player[data-fit="fill"] video,
 [data-fit="fill"] video,

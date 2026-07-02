@@ -114,6 +114,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
       statusTitle,
     } = useLiveStreamController({
       src,
+      playerId,
       playerRef,
       servers,
       activeServerId: activeServerId ?? null,
@@ -194,7 +195,8 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
       }
     };
 
-    const showOverlayChat = isChatOpen && (isMobile || fullscreen);
+    const canUseOverlayChat = isMobile || fullscreen;
+    const showOverlayChat = isChatOpen && canUseOverlayChat;
 
     return (
       <div 
@@ -212,6 +214,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
           crossOrigin="anonymous"
           playsInline
           streamType="live"
+          logLevel="silent"
           ref={playerRef}
           onPlay={onPlay}
           onPause={onPause}
@@ -349,13 +352,9 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
           </div>
 
           {/* Chat Overlay inside the video player (rendered when chat is open and either on mobile or fullscreen) */}
-          {playerId && (isMobile || fullscreen || showOverlayChat) && (
+          {playerId && showOverlayChat && (
             <div
-              className={`absolute inset-y-0 right-0 w-full sm:w-80 md:w-96 z-40 flex flex-col pointer-events-auto transition-all duration-300 ${
-                showOverlayChat
-                  ? "translate-x-0 opacity-100"
-                  : "translate-x-full opacity-0 pointer-events-none"
-              }`}
+              className="absolute inset-y-0 right-0 z-40 flex w-full flex-col pointer-events-auto transition-all duration-200 sm:w-80 md:w-96"
               onClick={(e) => e.stopPropagation()}
             >
               <LiveMatchChat

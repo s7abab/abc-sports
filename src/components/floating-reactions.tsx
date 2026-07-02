@@ -21,7 +21,13 @@ interface FloatingReactionsProps {
 
 export function FloatingReactions({ isChatOverlayOpen = false }: FloatingReactionsProps) {
   const [emojis, setEmojis] = useState<FlyingEmoji[]>([]);
-  const [isFloatingEnabled, setIsFloatingEnabled] = useState(false);
+  const [isFloatingEnabled, setIsFloatingEnabled] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    return localStorage.getItem("live_chat_float_enabled") === "true";
+  });
   // Use refs to access the latest state, deduplicate, and throttle rendering
   const isChatOverlayOpenRef = useRef(isChatOverlayOpen);
   const seenIdsRef = useRef(new Set<string>());
@@ -32,10 +38,6 @@ export function FloatingReactions({ isChatOverlayOpen = false }: FloatingReactio
   }, [isChatOverlayOpen]);
 
   useEffect(() => {
-    // Read initial state from localStorage (disabled initially if not set or false)
-    const stored = localStorage.getItem("live_chat_float_enabled");
-    setIsFloatingEnabled(stored === "true");
-
     const handleToggle = (event: Event) => {
       const customEvent = event as CustomEvent<{ enabled: boolean }>;
       setIsFloatingEnabled(customEvent.detail.enabled);

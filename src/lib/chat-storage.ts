@@ -15,7 +15,8 @@ export interface ChatMessage {
 
 const MAX_BODY_LENGTH = 280;
 const MAX_AUTHOR_LENGTH = 28;
-const MAX_ROOM_MESSAGES = 400;
+export const CHAT_HISTORY_LIMIT = 100;
+export const MAX_STORED_ROOM_MESSAGES = 400;
 
 function normalizeKind(value: unknown): ChatMessageKind {
   return value === "reaction" ? "reaction" : "message";
@@ -44,24 +45,43 @@ export async function readChatMessages(playerId: string, after?: string | null):
     return [];
   }
 
-  let query = getSupabaseStorageClient()
+  const supabase = getSupabaseStorageClient();
+
+  if (after) {
+    const { data, error } = await supabase
+      .from("chat_messages")
+      .select("id, player_id, author, body, kind, created_at")
+      .eq("player_id", trimmedPlayerId)
+      .gt("created_at", after)
+      .order("created_at", { ascending: true })
+      .limit(CHAT_HISTORY_LIMIT);
+
+    if (error) {
+      throw error;
+    }
+
+    return (data ?? []).map((row) => ({
+      id: row.id,
+      playerId: row.player_id,
+      author: row.author,
+      body: row.body,
+      kind: normalizeKind(row.kind),
+      createdAt: new Date(row.created_at).toISOString(),
+    }));
+  }
+
+  const { data, error } = await supabase
     .from("chat_messages")
     .select("id, player_id, author, body, kind, created_at")
     .eq("player_id", trimmedPlayerId)
-    .order("created_at", { ascending: true })
-    .limit(100);
-
-  if (after) {
-    query = query.gt("created_at", after);
-  }
-
-  const { data, error } = await query;
+    .order("created_at", { ascending: false })
+    .limit(CHAT_HISTORY_LIMIT);
 
   if (error) {
     throw error;
   }
 
-  return (data ?? []).map((row) => ({
+  return (data ?? []).reverse().map((row) => ({
     id: row.id,
     playerId: row.player_id,
     author: row.author,
@@ -114,7 +134,7 @@ export async function createChatMessage(
     .select("id")
     .eq("player_id", trimmedPlayerId)
     .order("created_at", { ascending: false })
-    .range(MAX_ROOM_MESSAGES, MAX_ROOM_MESSAGES + 100);
+    .range(MAX_STORED_ROOM_MESSAGES, MAX_STORED_ROOM_MESSAGES + 100);
 
   if (oldMessagesError) {
     throw oldMessagesError;

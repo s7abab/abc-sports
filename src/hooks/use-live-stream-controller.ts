@@ -18,6 +18,7 @@ import {
 
 interface LiveStreamControllerInput {
   src: string;
+  playerId?: string;
   playerRef: RefObject<MediaPlayerInstance | null>;
   servers: StreamServerOption[];
   activeServerId: StreamServerId | null;
@@ -54,6 +55,7 @@ function getMediaElement(player: MediaPlayerInstance | null): HTMLMediaElement |
 
 export function useLiveStreamController({
   src,
+  playerId,
   playerRef,
   servers,
   activeServerId,
@@ -82,6 +84,8 @@ export function useLiveStreamController({
   const reloadedDuringStallRef = useRef(false);
   const hlsFailureBurstRef = useRef(0);
   const handledErrorForSrcRef = useRef<string | null>(null);
+  const reportedRecoveryRef = useRef(false);
+  const lastReportedEventRef = useRef(new Map<string, number>());
 
   const bufferAhead = getBufferAhead(currentTime, bufferedEnd);
   const liveLatency = getLiveLatency(currentTime, seekableEnd);
@@ -93,6 +97,54 @@ export function useLiveStreamController({
     const separator = src.includes("?") ? "&" : "?";
     return `${src}${separator}retry=${retryCount}`;
   }, [src, retryCount]);
+
+  const reportHealthEvent = useCallback(
+    (payload: {
+      type: "server_failed" | "server_switch" | "stream_recovered";
+      serverId: string;
+      serverName?: string;
+      targetServerId?: string;
+      targetServerName?: string;
+      reason?: string;
+    }) => {
+      if (!playerId) return;
+
+      const key = [
+        payload.type,
+        playerId,
+        payload.serverId,
+        payload.targetServerId ?? "",
+        payload.reason ?? "",
+      ].join(":");
+      const now = Date.now();
+      const cooldownMs =
+        payload.type === "server_failed"
+          ? 60_000
+          : payload.type === "server_switch"
+          ? 15_000
+          : 30_000;
+      const lastReportedAt = lastReportedEventRef.current.get(key) ?? 0;
+
+      if (now - lastReportedAt < cooldownMs) {
+        return;
+      }
+
+      lastReportedEventRef.current.set(key, now);
+
+      fetch("/api/stream-health", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          playerId,
+          ...payload,
+        }),
+        keepalive: true,
+      }).catch(() => {
+        // Health reporting must never affect playback.
+      });
+    },
+    [playerId]
+  );
 
   const ensureScore = useCallback((serverId: StreamServerId) => {
     const existing = scoresRef.current.get(serverId);
@@ -133,8 +185,16 @@ export function useLiveStreamController({
         next.add(serverId);
         return next;
       });
+
+      const serverName = servers.find((server) => server.id === serverId)?.name;
+      reportHealthEvent({
+        type: "server_failed",
+        serverId,
+        serverName,
+        reason: "Playback health dropped below recovery threshold.",
+      });
     },
-    [ensureScore]
+    [ensureScore, reportHealthEvent, servers]
   );
 
   const switchToBestServer = useCallback(
@@ -162,6 +222,14 @@ export function useLiveStreamController({
       lastSwitchAtRef.current = now;
       setPhase("switching");
       setAutoSwitchingTo(nextServer.name);
+      reportHealthEvent({
+        type: "server_switch",
+        serverId: activeServerId,
+        serverName: servers.find((server) => server.id === activeServerId)?.name,
+        targetServerId: nextServer.id,
+        targetServerName: nextServer.name,
+        reason,
+      });
       onServerChange(nextServer.id);
 
       window.setTimeout(() => {
@@ -170,7 +238,7 @@ export function useLiveStreamController({
 
       return true;
     },
-    [activeServerId, isAutoSwitchEnabled, onServerChange, servers]
+    [activeServerId, isAutoSwitchEnabled, onServerChange, reportHealthEvent, servers]
   );
 
   const handleRefresh = useCallback(() => {
@@ -224,6 +292,7 @@ export function useLiveStreamController({
     reloadedDuringStallRef.current = false;
     hlsFailureBurstRef.current = 0;
     handledErrorForSrcRef.current = null;
+    reportedRecoveryRef.current = false;
 
     const resetTimer = window.setTimeout(() => {
       setCountdown(null);
@@ -257,11 +326,21 @@ export function useLiveStreamController({
             score: clampServerScore(current.score + 10),
           });
         }
+
+        if (!reportedRecoveryRef.current) {
+          reportedRecoveryRef.current = true;
+          reportHealthEvent({
+            type: "stream_recovered",
+            serverId: activeServerId,
+            serverName: servers.find((server) => server.id === activeServerId)?.name,
+            reason: "Playback is healthy again.",
+          });
+        }
       }
     }, 1_000);
 
     return () => window.clearInterval(intervalId);
-  }, [activeServerId, canPlay, ensureScore, error, playing, waiting]);
+  }, [activeServerId, canPlay, ensureScore, error, playing, reportHealthEvent, servers, waiting]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
