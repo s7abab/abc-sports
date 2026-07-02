@@ -43,6 +43,7 @@ export default function DashboardPage() {
     playerId: "1",
     homeLogoUrl: "",
     awayLogoUrl: "",
+    status: "pending",
   });
 
   // Single Player Configuration Modal State
@@ -406,6 +407,7 @@ export default function DashboardPage() {
       playerId: match.playerId || "1",
       homeLogoUrl: match.homeLogoUrl || "",
       awayLogoUrl: match.awayLogoUrl || "",
+      status: match.live ? "live" : (match.status === "completed" ? "completed" : "pending"),
     });
   };
 
@@ -421,6 +423,7 @@ export default function DashboardPage() {
       playerId: players[0]?.id || "1",
       homeLogoUrl: "",
       awayLogoUrl: "",
+      status: "pending",
     });
   };
 
@@ -463,7 +466,8 @@ export default function DashboardPage() {
       playerId: matchForm.playerId || players[0]?.id || "1",
       homeLogoUrl: matchForm.homeLogoUrl.trim(),
       awayLogoUrl: matchForm.awayLogoUrl.trim(),
-      live: deriveRuntimeMatchStatus(date) === "live",
+      live: matchForm.status === "live",
+      status: matchForm.status === "completed" ? "completed" : (matchForm.status === "live" ? "today" : "upcoming"),
     };
 
     if (!payload.competition || !payload.date || !payload.home || !payload.away) {
@@ -504,6 +508,7 @@ export default function DashboardPage() {
         playerId: players[0]?.id || "1",
         homeLogoUrl: "",
         awayLogoUrl: "",
+        status: "pending",
       });
     } catch (err) {
       setMatchError("An error occurred while saving the match.");
@@ -513,7 +518,7 @@ export default function DashboardPage() {
   };
 
   const filteredMatches = matches.filter((match) => {
-    const matchStatus = deriveRuntimeMatchStatus(match.date);
+    const matchStatus = match.live ? "live" : (match.status === "completed" ? "completed" : deriveRuntimeMatchStatus(match.date));
 
     if (activeMatchFilter === "today") {
       return matchStatus === "today" || matchStatus === "live";
@@ -716,6 +721,26 @@ export default function DashboardPage() {
                     ))}
                   </select>
                   <p className="text-[10px] text-slate-500">Clicking this match opens that player.</p>
+                </label>
+
+                <label className="space-y-1.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                    Match / Stream Status
+                  </span>
+                  <select
+                    value={matchForm.status}
+                    onChange={(e) =>
+                      setMatchForm((prev) => ({ ...prev, status: e.target.value }))
+                    }
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white outline-none transition focus:border-violet-500/50 cursor-pointer"
+                  >
+                    <option value="pending" className="bg-[#09090b]">Scheduled (Link not added)</option>
+                    <option value="live" className="bg-[#09090b]">Live (Link is ready)</option>
+                    <option value="completed" className="bg-[#09090b]">Match Completed</option>
+                  </select>
+                  <p className="text-[10px] text-slate-500">
+                    Determines routing (Live -&gt; Player directly, Completed -&gt; Completion card).
+                  </p>
                 </label>
 
                 <div className="grid gap-3 sm:grid-cols-2">

@@ -96,7 +96,9 @@ export default function MatchDetailsPage({
     fetchMatch();
   }, [id]);
 
-  const status = match ? deriveRuntimeMatchStatus(match.date) : null;
+  const status = match
+    ? (match.live ? "live" : (match.status === "completed" ? "completed" : deriveRuntimeMatchStatus(match.date)))
+    : null;
   const playerHref = match ? `/player/${match.playerId}` : "";
 
   // Auto redirect if match is live
@@ -173,9 +175,23 @@ export default function MatchDetailsPage({
           </p>
 
           {status === "completed" ? (
-            <p className="mt-10 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-              Completed
-            </p>
+            <div className="mt-10 border-t border-white/[0.05] pt-8 flex flex-col items-center justify-center animate-in fade-in duration-300">
+              <div className="h-12 w-12 rounded-full bg-zinc-900/50 border border-white/10 flex items-center justify-center mb-4">
+                <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 className="text-sm font-bold text-zinc-200 uppercase tracking-wider">Match Completed</h3>
+              <p className="text-xs text-zinc-550 mt-2 max-w-xs leading-relaxed">
+                This event has finished and the live broadcast is over. Check the schedule for other active streams.
+              </p>
+              <Link
+                href="/"
+                className="mt-6 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-zinc-300 hover:bg-white/10 hover:text-white transition duration-200"
+              >
+                Back to Schedule
+              </Link>
+            </div>
           ) : liveStart ? (
             <div className="mt-10 border-t border-white/[0.05] pt-8">
               <p className="mb-5 text-xs font-semibold uppercase tracking-widest text-zinc-500">

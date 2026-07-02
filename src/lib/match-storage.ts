@@ -94,7 +94,7 @@ function normalizeMatch(value: unknown): MatchConfig | null {
   return {
     id: typeof match.id === "string" && match.id.trim() ? match.id : randomUUID(),
     live: Boolean(match.live),
-    status: deriveMatchStatus(normalizedDate),
+    status: match.status === "completed" ? "completed" : deriveMatchStatus(normalizedDate),
     competition,
     date: normalizedDate,
     home,
@@ -146,7 +146,7 @@ export async function readMatches(): Promise<MatchConfig[]> {
   await seedDefaultMatchesIfEmpty();
   const { data, error } = await getSupabaseStorageClient()
     .from("matches")
-    .select("id, live, competition, date, home, away, player_id, home_logo_url, away_logo_url")
+    .select("id, live, status, competition, date, home, away, player_id, home_logo_url, away_logo_url")
     .order("position", { ascending: true });
 
   if (error) {
@@ -156,7 +156,7 @@ export async function readMatches(): Promise<MatchConfig[]> {
   return (data ?? []).map((row) => ({
     id: row.id,
     live: row.live,
-    status: deriveMatchStatus(row.date),
+    status: (row.status === "completed" ? "completed" : deriveMatchStatus(row.date)) as MatchStatus,
     competition: row.competition,
     date: row.date,
     home: row.home,

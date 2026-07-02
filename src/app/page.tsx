@@ -166,7 +166,9 @@ export default function Home() {
   const upcomingMatches = matches
     .map((match) => ({
       ...match,
-      runtimeStatus: deriveRuntimeMatchStatus(match.date, now),
+      runtimeStatus: match.live
+        ? ("live" as RuntimeMatchStatus)
+        : (match.status === "completed" ? ("completed" as RuntimeMatchStatus) : deriveRuntimeMatchStatus(match.date, now)),
     }))
     .filter((match) => match.runtimeStatus !== "completed")
     .sort((first, second) => getMatchSortValue(first.date) - getMatchSortValue(second.date));
