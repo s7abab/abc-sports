@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { VideoPlayer } from "@/components/video-player";
-import { Loader2, Server } from "lucide-react";
+import { ArrowLeft, Loader2, Radio, ShieldCheck, WifiOff } from "lucide-react";
 import type { MediaPlayerInstance } from "@vidstack/react";
 
 interface PlayerConfig {
@@ -62,7 +62,7 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
         } else {
           setError("Failed to fetch player settings from server.");
         }
-      } catch (err) {
+      } catch {
         setError("An error occurred while loading stream.");
       } finally {
         setIsLoading(false);
@@ -95,7 +95,7 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
         }))
     : [];
 
-  const currentStreamUrl = player && activeServerId ? player.servers[activeServerId]?.url : "";
+  const currentStreamUrl = player && activeServerId ? player.servers[activeServerId]?.url ?? "" : "";
 
   const switchServer = (serverId: string) => {
     const wasFullscreen = Boolean(videoPlayerRef.current?.state.fullscreen || document.fullscreenElement);
@@ -117,141 +117,223 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
   };
 
   return (
-    <main className="min-h-screen bg-[#09090b] text-slate-100 flex flex-col relative overflow-x-hidden">
-      {/* Decorative gradient overlay */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-violet-950/20 via-[#09090b] to-[#09090b] pointer-events-none z-0"></div>
+    <main className="relative flex min-h-dvh flex-col overflow-x-hidden bg-[#09090b] text-slate-100">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(124,58,237,0.24),transparent_46%),linear-gradient(135deg,rgba(15,23,42,0.75),rgba(9,9,11,0.2)_42%,rgba(6,78,59,0.12))]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/60 to-transparent" />
 
-      <div className="w-full max-w-7xl mx-auto px-4 pt-2 pb-4 md:pt-3 md:pb-5 z-10 flex-grow flex flex-col gap-2.5 md:gap-3">
-        <div className="flex items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center gap-2">
+      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+        <header className="flex items-center justify-between gap-2 rounded-2xl border border-white/[0.07] bg-white/[0.035] p-2 shadow-xl shadow-black/20 backdrop-blur-md sm:p-2.5">
+          <div className="flex min-w-0 items-center">
             <Link
               href="/"
-              className="inline-flex items-center justify-center gap-1 rounded-lg bg-black hover:bg-white/5 border border-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-300 hover:text-white transition-all duration-200 active:scale-95 shadow-md"
+              className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-black/40 px-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-200 shadow-lg shadow-black/20 transition hover:border-white/20 hover:bg-white/10 hover:text-white active:scale-95"
             >
-              ← Back
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span>Back</span>
             </Link>
-            {player && (
-              <span className="text-xs font-black uppercase tracking-wider text-slate-200 truncate max-w-[120px] sm:max-w-[200px]">
-                {player.name}
-              </span>
-            )}
           </div>
-          
-          {whatsappUrl && (
+
+          <div className="flex shrink-0 items-center justify-end">
+            {whatsappUrl && (
             <a
               href={whatsappUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-1.5 rounded-full bg-[#25D366] hover:bg-[#20ba5a] text-[#09090b] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider shadow-[0_2px_10px_rgba(37,211,102,0.2)] transition-all hover:scale-105 cursor-pointer animate-in fade-in duration-350"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#25D366] text-[#09090b] shadow-[0_6px_18px_rgba(37,211,102,0.22)] transition hover:scale-[1.06] hover:bg-[#20ba5a] active:scale-95"
+              aria-label="Join WhatsApp group"
             >
-              <svg className="h-3 w-3 fill-current" viewBox="0 0 24 24">
+              <svg className="h-3.5 w-3.5 fill-current" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M12.031 2c-5.514 0-9.989 4.475-9.989 9.989 0 1.763.459 3.486 1.33 5.006L2 22l5.185-1.359a9.92 9.92 0 004.847 1.258c5.514 0 9.989-4.475 9.989-9.989S17.545 2 12.031 2zm0 18.294a8.276 8.276 0 01-4.222-1.157l-.303-.18-3.136.822.836-3.056-.197-.314a8.272 8.272 0 01-1.267-4.42c0-4.57 3.719-8.29 8.29-8.29 4.57 0 8.29 3.72 8.29 8.29s-3.72 8.29-8.29 8.29zM16.14 13.9c-.226-.113-1.337-.66-1.543-.736-.207-.076-.358-.113-.509.113-.15.226-.583.735-.715.885-.132.15-.263.17-.489.057a6.167 6.167 0 01-1.815-1.121 6.8 6.8 0 01-1.255-1.564c-.132-.226-.014-.348.099-.461.102-.102.226-.264.339-.396.113-.132.15-.226.226-.377.076-.15.038-.283-.019-.396-.056-.113-.509-1.225-.697-1.677-.183-.44-.369-.38-.509-.388a5.19 5.19 0 00-.433-.008c-.15 0-.396.056-.603.283-.207.226-.79.772-.79 1.883s.809 2.185.922 2.336c.113.15 1.59 2.429 3.854 3.407.538.232.959.371 1.287.475.54.172 1.03.148 1.417.09.433-.064 1.337-.546 1.525-1.074.189-.527.189-.979.132-1.074-.056-.095-.207-.15-.433-.264z" />
               </svg>
-              <span>WhatsApp</span>
             </a>
-          )}
-        </div>
+            )}
+          </div>
+        </header>
 
-        {/* Video Player Box */}
         {isLoading ? (
-          <div className="aspect-video w-full rounded-2xl bg-black/60 border border-white/5 flex flex-col items-center justify-center gap-3">
-            <Loader2 className="h-8 w-8 text-violet-500 animate-spin" />
-            <p className="text-xs text-slate-400 font-medium">Loading stream...</p>
+          <div className="grid min-h-[54vh] place-items-center rounded-3xl border border-white/[0.07] bg-black/50 p-8 text-center shadow-2xl shadow-black/30">
+            <div className="flex flex-col items-center gap-4">
+              <div className="grid h-16 w-16 place-items-center rounded-2xl bg-violet-500/10">
+                <Loader2 className="h-8 w-8 animate-spin text-violet-300" />
+              </div>
+              <div>
+                <h2 className="text-lg font-black text-white">Loading stream</h2>
+                <p className="mt-1 text-sm text-slate-400">Finding the best available server for this channel.</p>
+              </div>
+            </div>
           </div>
         ) : error ? (
-          <div className="aspect-video w-full rounded-2xl bg-black/60 border border-white/5 flex flex-col items-center justify-center gap-2 text-center text-slate-400">
-            <p className="text-sm font-semibold text-rose-400">{error}</p>
+          <div className="grid min-h-[54vh] place-items-center rounded-3xl border border-rose-500/20 bg-rose-950/10 p-8 text-center shadow-2xl shadow-black/30">
+            <div className="mx-auto flex max-w-md flex-col items-center gap-4">
+              <div className="grid h-16 w-16 place-items-center rounded-2xl bg-rose-500/10">
+                <WifiOff className="h-8 w-8 text-rose-300" />
+              </div>
+              <div>
+                <h2 className="text-lg font-black text-white">Unable to open player</h2>
+                <p className="mt-2 text-sm leading-6 text-rose-100/80">{error}</p>
+              </div>
+              <Link
+                href="/"
+                className="inline-flex h-11 items-center justify-center rounded-full border border-white/10 bg-white/5 px-5 text-xs font-bold uppercase tracking-wider text-slate-200 transition hover:bg-white/10 hover:text-white"
+              >
+                Return home
+              </Link>
+            </div>
           </div>
         ) : player && currentStreamUrl ? (
-          <div className="flex flex-col gap-2 w-full">
-            <div className="flex min-w-0 flex-col gap-4">
-              <VideoPlayer
-                ref={videoPlayerRef}
-                src={currentStreamUrl}
-                title={player.name}
-                autoPlay={true}
-                playerId={playerId}
-                servers={availableServers}
-                activeServerId={activeServerId}
-                onServerChange={switchServer}
-                isAutoSwitchEnabled={isAutoSwitchEnabled}
-              />
+          <section className="flex flex-1 flex-col gap-4">
+            <div className="relative rounded-[2rem] border border-white/10 bg-gradient-to-br from-white/12 via-white/[0.035] to-emerald-500/10 p-2 shadow-2xl shadow-black/40 ring-1 ring-white/[0.03] sm:p-3">
+              <div className="pointer-events-none absolute inset-0 rounded-[2rem] bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.18),transparent_32%),radial-gradient(circle_at_100%_100%,rgba(16,185,129,0.16),transparent_34%)]" />
+              <div className="relative overflow-hidden rounded-[1.45rem] border border-black/60 bg-black shadow-inner shadow-black sm:rounded-[1.6rem]">
+                <VideoPlayer
+                  ref={videoPlayerRef}
+                  src={currentStreamUrl}
+                  title={player.name}
+                  autoPlay={true}
+                  playerId={playerId}
+                  servers={availableServers}
+                  activeServerId={activeServerId}
+                  onServerChange={switchServer}
+                  isAutoSwitchEnabled={isAutoSwitchEnabled}
+                />
+              </div>
             </div>
 
-            {/* Settings and Controls Card */}
-            <div className="w-full bg-[#0f1115]/60 backdrop-blur-md border border-white/10 rounded-xl p-2 md:py-1.5 md:px-3 flex flex-col sm:flex-row sm:items-center justify-center gap-2.5 md:gap-4 transition-all duration-300 hover:border-violet-500/20">
-              {/* Auto-Switch Server Switch */}
-              <button
-                type="button"
-                onClick={toggleAutoSwitch}
-                className="flex items-center justify-between gap-5 w-full sm:w-auto text-left cursor-pointer group focus:outline-none select-none hover:bg-white/[0.04] active:scale-[0.98] px-3 py-1.5 rounded-lg transition-all duration-200 border border-transparent hover:border-white/5"
-                aria-label="Toggle automatic server switching"
+            {whatsappUrl && (
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex items-center justify-between gap-3 rounded-2xl border border-[#25D366]/25 bg-[#25D366]/10 px-3 py-2.5 shadow-lg shadow-black/20 backdrop-blur-md transition hover:border-[#25D366]/40 hover:bg-[#25D366]/15 active:scale-[0.99] sm:px-4"
               >
-                <div className="flex items-center gap-2">
-                  <Server className="w-3.5 h-3.5 text-violet-400 group-hover:scale-110 transition-transform duration-200" />
-                  <span className="text-xs font-bold text-slate-200">
-                    Auto-Switch Server
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className={`text-[9px] font-bold tracking-wider uppercase transition-colors duration-200 ${isAutoSwitchEnabled ? "text-violet-400" : "text-slate-500"}`}>
-                    {isAutoSwitchEnabled ? "ON" : "OFF"}
-                  </span>
-                  <div
-                    className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border border-transparent transition-colors duration-200 ease-in-out ${
-                      isAutoSwitchEnabled ? "bg-violet-600" : "bg-slate-800"
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${
-                        isAutoSwitchEnabled ? "translate-x-4" : "translate-x-0"
-                      }`}
-                    />
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#25D366] text-[#09090b] shadow-[0_6px_16px_rgba(37,211,102,0.22)] transition group-hover:scale-105">
+                    <svg className="h-4 w-4 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12.031 2c-5.514 0-9.989 4.475-9.989 9.989 0 1.763.459 3.486 1.33 5.006L2 22l5.185-1.359a9.92 9.92 0 004.847 1.258c5.514 0 9.989-4.475 9.989-9.989S17.545 2 12.031 2zm0 18.294a8.276 8.276 0 01-4.222-1.157l-.303-.18-3.136.822.836-3.056-.197-.314a8.272 8.272 0 01-1.267-4.42c0-4.57 3.719-8.29 8.29-8.29 4.57 0 8.29 3.72 8.29 8.29s-3.72 8.29-8.29 8.29zM16.14 13.9c-.226-.113-1.337-.66-1.543-.736-.207-.076-.358-.113-.509.113-.15.226-.583.735-.715.885-.132.15-.263.17-.489.057a6.167 6.167 0 01-1.815-1.121 6.8 6.8 0 01-1.255-1.564c-.132-.226-.014-.348.099-.461.102-.102.226-.264.339-.396.113-.132.15-.226.226-.377.076-.15.038-.283-.019-.396-.056-.113-.509-1.225-.697-1.677-.183-.44-.369-.38-.509-.388a5.19 5.19 0 00-.433-.008c-.15 0-.396.056-.603.283-.207.226-.79.772-.79 1.883s.809 2.185.922 2.336c.113.15 1.59 2.429 3.854 3.407.538.232.959.371 1.287.475.54.172 1.03.148 1.417.09.433-.064 1.337-.546 1.525-1.074.189-.527.189-.979.132-1.074-.056-.095-.207-.15-.433-.264z" />
+                    </svg>
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="truncate text-xs font-black uppercase tracking-wider text-white">
+                      Join WhatsApp Group
+                    </h2>
+                    <p className="mt-0.5 truncate text-[10px] font-medium text-slate-300">
+                      Stream updates and match alerts
+                    </p>
                   </div>
                 </div>
-              </button>
+                <span className="hidden rounded-full bg-[#25D366] px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-[#09090b] shadow-[0_6px_16px_rgba(37,211,102,0.2)] transition group-hover:scale-105 sm:inline-flex">
+                  Join Now
+                </span>
+              </a>
+            )}
 
-              {/* Divider on desktop */}
-              <div className="hidden sm:block h-4 w-px bg-white/10" />
-
-              <div className="flex min-w-0 w-full sm:w-auto flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
-                <div className="flex items-center gap-2 px-3 sm:px-0">
-                  <Server className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span className="text-xs font-bold text-slate-200">
-                    Servers
-                  </span>
+            <div className="grid gap-3">
+              <div className="rounded-3xl border border-white/[0.07] bg-[#0f1115]/80 p-4 shadow-xl shadow-black/20 backdrop-blur-md sm:p-5">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <Radio className="h-4 w-4 text-emerald-300" />
+                      <h2 className="text-sm font-black uppercase tracking-wider text-white">
+                        Stream Servers
+                      </h2>
+                    </div>
+                    <p className="mt-1 text-xs leading-5 text-slate-400">
+                      Choose another server if playback is slow or unavailable.
+                    </p>
+                  </div>
                 </div>
-                <div className="flex min-w-0 flex-wrap gap-1.5 px-3 sm:px-0">
+
+                <div className="mt-4 grid grid-cols-2 gap-2">
                   {availableServers.map((server) => (
                     <button
                       key={server.id}
                       type="button"
                       onClick={() => switchServer(server.id)}
-                      className={`min-h-8 max-w-[9rem] rounded-lg border px-2.5 text-[10px] font-bold transition-all duration-200 active:scale-95 ${
+                      className={`min-h-11 min-w-0 rounded-2xl border px-3 text-sm font-bold transition active:scale-95 ${
                         activeServerId === server.id
-                          ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300"
-                          : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white"
+                          ? "border-emerald-400/50 bg-emerald-400/15 text-emerald-100 shadow-lg shadow-emerald-950/20"
+                          : "border-white/10 bg-white/[0.04] text-slate-300 hover:border-white/20 hover:bg-white/10 hover:text-white"
                       }`}
                       aria-pressed={activeServerId === server.id}
                     >
-                      <span className="block truncate">{server.name}</span>
+                      <span className="flex items-center gap-2">
+                        <span
+                          className={`h-2 w-2 rounded-full ${
+                            activeServerId === server.id ? "bg-emerald-300" : "bg-slate-600"
+                          }`}
+                        />
+                        <span className="truncate">{server.name}</span>
+                      </span>
                     </button>
                   ))}
                 </div>
+
+                <button
+                  type="button"
+                  onClick={toggleAutoSwitch}
+                  className="mt-4 flex w-full items-center justify-between gap-3 rounded-2xl border border-white/[0.07] bg-black/25 px-3 py-2.5 text-left transition hover:border-violet-400/25 hover:bg-white/[0.05] active:scale-[0.99]"
+                  aria-pressed={isAutoSwitchEnabled}
+                  aria-label="Toggle automatic server switching"
+                >
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-violet-500/10 text-violet-200">
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                    </div>
+                    <span
+                      className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs font-black uppercase tracking-wider text-white"
+                    >
+                      Auto-Switch Server
+                      <span className="rounded-full border border-amber-400/25 bg-amber-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-amber-200">
+                        Beta
+                      </span>
+                    </span>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span
+                      className={`hidden text-[10px] font-black uppercase tracking-wider sm:inline ${
+                        isAutoSwitchEnabled ? "text-violet-200" : "text-slate-500"
+                      }`}
+                    >
+                      {isAutoSwitchEnabled ? "On" : "Off"}
+                    </span>
+                    <span
+                      className={`relative inline-flex h-6 w-11 rounded-full border transition ${
+                        isAutoSwitchEnabled
+                          ? "border-violet-400/30 bg-violet-500"
+                          : "border-white/10 bg-slate-800"
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${
+                          isAutoSwitchEnabled ? "translate-x-5" : "translate-x-0.5"
+                        }`}
+                      />
+                    </span>
+                  </div>
+                </button>
               </div>
             </div>
-          </div>
+          </section>
         ) : (
-          <div className="aspect-video w-full rounded-2xl bg-black/40 border border-dashed border-white/5 flex flex-col items-center justify-center p-6 text-center select-none text-slate-500">
-            <svg className="w-10 h-10 text-slate-700 mb-3 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 18a3.75 3.75 0 0 0 .495-7.467 5.99 5.99 0 0 0-1.925 0A3.75 3.75 0 0 0 12 18Z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 12a7.5 7.5 0 0 0-15 0" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 12a9.75 9.75 0 0 0-19.5 0" />
-            </svg>
-            <h3 className="text-sm font-semibold text-slate-400">Channel Offline</h3>
-            <p className="text-[11px] text-slate-600 max-w-xs mt-1">
-              There is currently no live stream source configured for this channel.
-            </p>
+          <div className="grid min-h-[54vh] place-items-center rounded-3xl border border-dashed border-white/[0.08] bg-black/35 p-8 text-center shadow-2xl shadow-black/30">
+            <div className="mx-auto flex max-w-md flex-col items-center gap-4">
+              <div className="grid h-16 w-16 place-items-center rounded-2xl bg-slate-800/70">
+                <WifiOff className="h-8 w-8 text-slate-500" />
+              </div>
+              <div>
+                <h2 className="text-xl font-black text-white">Channel offline</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-400">
+                  No live stream source is configured for this player right now. Check back later or open another match from the home page.
+                </p>
+              </div>
+              <Link
+                href="/"
+                className="inline-flex h-11 items-center justify-center rounded-full border border-white/10 bg-white/5 px-5 text-xs font-bold uppercase tracking-wider text-slate-200 transition hover:bg-white/10 hover:text-white"
+              >
+                Browse matches
+              </Link>
+            </div>
           </div>
         )}
       </div>
