@@ -8,6 +8,7 @@ export interface PlayerServer {
   name: string;
   url: string;
   isIframe?: boolean;
+  blockPopups?: boolean;
 }
 
 export interface PlayerConfig {
@@ -39,7 +40,7 @@ function loadSeedPlayers(): PlayerConfig[] {
 }
 
 function createEmptyServer(): PlayerServer {
-  return { name: "", url: "", isIframe: false };
+  return { name: "", url: "", isIframe: false, blockPopups: true };
 }
 
 function normalizeServer(value: unknown): PlayerServer {
@@ -52,6 +53,7 @@ function normalizeServer(value: unknown): PlayerServer {
     name: typeof server.name === "string" ? server.name : "",
     url: typeof server.url === "string" ? server.url : "",
     isIframe: server.isIframe === true,
+    blockPopups: server.blockPopups !== false,
   };
 }
 

@@ -17,6 +17,7 @@ interface PlayerServer {
   name: string;
   url: string;
   isIframe?: boolean;
+  blockPopups?: boolean;
 }
 
 type PlayerServers = Record<string, PlayerServer>;
@@ -40,7 +41,7 @@ interface StreamHealthAlert {
 const DEFAULT_SERVER_SLOT_COUNT = 4;
 
 function createEmptyServer(): PlayerServer {
-  return { name: "", url: "", isIframe: false };
+  return { name: "", url: "", isIframe: false, blockPopups: true };
 }
 
 function sortServerIds(servers: PlayerServers) {
@@ -64,6 +65,7 @@ function createEditableServers(servers?: PlayerServers): PlayerServers {
       name: server?.name ?? "",
       url: server?.url ?? "",
       isIframe: server?.isIframe === true,
+      blockPopups: server?.blockPopups !== false,
     };
   });
 
@@ -80,6 +82,7 @@ function cleanServersForSave(servers: PlayerServers): PlayerServers {
       name,
       url,
       isIframe: server.isIframe === true,
+      blockPopups: server.blockPopups !== false,
     };
     return acc;
   }, {});
@@ -506,6 +509,16 @@ export default function DashboardPage() {
     }));
   };
 
+  const handleInlineBlockPopupsToggle = (slot: string) => {
+    setInputUrls((prev) => ({
+      ...prev,
+      [slot]: {
+        ...(prev[slot] ?? createEmptyServer()),
+        blockPopups: !(prev[slot]?.blockPopups !== false),
+      },
+    }));
+  };
+
   const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingPlayer) return;
@@ -595,6 +608,19 @@ export default function DashboardPage() {
         [slot]: {
           ...(prev[playerId]?.[slot] ?? createEmptyServer()),
           isIframe: !(prev[playerId]?.[slot]?.isIframe === true),
+        },
+      },
+    }));
+  };
+
+  const handleBulkBlockPopupsToggle = (playerId: string, slot: string) => {
+    setBulkInputUrls((prev) => ({
+      ...prev,
+      [playerId]: {
+        ...prev[playerId],
+        [slot]: {
+          ...(prev[playerId]?.[slot] ?? createEmptyServer()),
+          blockPopups: !(prev[playerId]?.[slot]?.blockPopups !== false),
         },
       },
     }));
@@ -1419,6 +1445,7 @@ export default function DashboardPage() {
                       src={activeStreamUrl}
                       title={player.name}
                       isIframe={activeServer?.isIframe === true}
+                      blockIframePopups={activeServer?.blockPopups !== false}
                       muted={true}
                       autoPlay={true}
                     />
@@ -1784,6 +1811,36 @@ export default function DashboardPage() {
                         <p className="mt-1 text-[9px] text-slate-500">
                           {inputUrls[slot].isIframe ? "Iframe mode embeds this page directly in the player frame." : "Stream mode plays HLS/m3u8 or direct media URLs."}
                         </p>
+                        {inputUrls[slot].isIframe && (
+                          <div className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-black/30 px-3 py-2">
+                            <div className="min-w-0">
+                              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-300">
+                                Block popup ads
+                              </p>
+                              <p className="mt-0.5 text-[9px] text-slate-500">
+                                Prevents this iframe from opening new tabs or windows.
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleInlineBlockPopupsToggle(slot)}
+                              className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition ${
+                                inputUrls[slot].blockPopups !== false
+                                  ? "border-emerald-400/40 bg-emerald-500"
+                                  : "border-white/10 bg-slate-800"
+                              }`}
+                              aria-pressed={inputUrls[slot].blockPopups !== false}
+                              aria-label={`Toggle popup blocking for server slot ${slot}`}
+                              title="Block iframe popups"
+                            >
+                              <span
+                                className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition ${
+                                  inputUrls[slot].blockPopups !== false ? "translate-x-4" : "translate-x-0.5"
+                                }`}
+                              />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1958,6 +2015,38 @@ export default function DashboardPage() {
                             ? "Iframe mode embeds this page directly in the player frame."
                             : "Stream mode plays HLS/m3u8 or direct media URLs."}
                         </p>
+                        {bulkInputUrls[activeBulkTab]?.[slot]?.isIframe && (
+                          <div className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-black/30 px-3 py-2">
+                            <div className="min-w-0">
+                              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-300">
+                                Block popup ads
+                              </p>
+                              <p className="mt-0.5 text-[9px] text-slate-500">
+                                Prevents this iframe from opening new tabs or windows.
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleBulkBlockPopupsToggle(activeBulkTab, slot)}
+                              className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition ${
+                                bulkInputUrls[activeBulkTab]?.[slot]?.blockPopups !== false
+                                  ? "border-emerald-400/40 bg-emerald-500"
+                                  : "border-white/10 bg-slate-800"
+                              }`}
+                              aria-pressed={bulkInputUrls[activeBulkTab]?.[slot]?.blockPopups !== false}
+                              aria-label={`Toggle popup blocking for server slot ${slot}`}
+                              title="Block iframe popups"
+                            >
+                              <span
+                                className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition ${
+                                  bulkInputUrls[activeBulkTab]?.[slot]?.blockPopups !== false
+                                    ? "translate-x-4"
+                                    : "translate-x-0.5"
+                                }`}
+                              />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

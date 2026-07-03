@@ -11,6 +11,7 @@ interface VideoPlayerProps {
   src: string;
   title: string;
   isIframe?: boolean;
+  blockIframePopups?: boolean;
   thumbnails?: string;
   onPlay?: () => void;
   onPause?: () => void;
@@ -44,7 +45,7 @@ const PIPToggle = () => {
 };
 
 export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
-  ({ src, title, isIframe = false, thumbnails, onPlay, onPause, children, muted = false, autoPlay = false, playerId, servers = [], activeServerId, onServerChange, isAutoSwitchEnabled = true }, ref) => {
+  ({ src, title, isIframe = false, blockIframePopups = true, thumbnails, onPlay, onPause, children, muted = false, autoPlay = false, playerId, servers = [], activeServerId, onServerChange, isAutoSwitchEnabled = true }, ref) => {
     const [objectFit, setObjectFit] = useState<"contain" | "cover" | "fill">(() => {
       if (typeof window === "undefined") return "contain";
       return window.matchMedia("(max-width: 640px), (pointer: coarse)").matches ? "fill" : "contain";
@@ -145,6 +146,10 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
     };
 
     if (isIframe) {
+      const iframeSandbox = blockIframePopups
+        ? "allow-same-origin allow-scripts allow-forms allow-presentation"
+        : "allow-same-origin allow-scripts allow-forms allow-presentation allow-popups";
+
       return (
         <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black/95 border border-white/10 shadow-2xl backdrop-blur-md transition-all duration-300 hover:border-violet-500/30 group">
           <iframe
@@ -156,7 +161,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
             allowFullScreen
             loading="eager"
             referrerPolicy="no-referrer-when-downgrade"
-            sandbox="allow-same-origin allow-scripts allow-forms allow-presentation allow-popups"
+            sandbox={iframeSandbox}
           />
 
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 select-none animate-in fade-in duration-500">

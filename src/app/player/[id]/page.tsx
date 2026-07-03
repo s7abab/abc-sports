@@ -11,7 +11,7 @@ interface PlayerConfig {
   id: string;
   name: string;
   primaryServer: string;
-  servers: Record<string, { name: string; url: string; isIframe?: boolean }>;
+  servers: Record<string, { name: string; url: string; isIframe?: boolean; blockPopups?: boolean }>;
 }
 
 function normalizeServers(value: unknown): PlayerConfig["servers"] {
@@ -21,11 +21,12 @@ function normalizeServers(value: unknown): PlayerConfig["servers"] {
 
   return Object.entries(value as Record<string, unknown>).reduce<PlayerConfig["servers"]>(
     (servers, [slot, server]) => {
-      const entry = server && typeof server === "object" ? (server as Partial<{ name: string; url: string; isIframe?: boolean }>) : {};
+      const entry = server && typeof server === "object" ? (server as Partial<{ name: string; url: string; isIframe?: boolean; blockPopups?: boolean }>) : {};
       servers[slot] = {
         name: typeof entry.name === "string" ? entry.name : "",
         url: typeof entry.url === "string" ? entry.url : "",
         isIframe: entry.isIframe === true,
+        blockPopups: entry.blockPopups !== false,
       };
       return servers;
     },
@@ -319,6 +320,7 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
                   src={currentStreamUrl}
                   title={player.name}
                   isIframe={currentServer?.isIframe === true}
+                  blockIframePopups={currentServer?.blockPopups !== false}
                   autoPlay={true}
                   playerId={playerId}
                   servers={availableServers}
