@@ -1,6 +1,6 @@
 "use client";
 
-import { MediaPlayer, MediaProvider, isHLSProvider, useMediaPlayer, useMediaStore, type MediaPlayerInstance, type MediaProviderAdapter } from "@vidstack/react";
+import { MediaPlayer, MediaProvider, PIPButton, isHLSProvider, useMediaStore, useMediaState, type MediaPlayerInstance, type MediaProviderAdapter } from "@vidstack/react";
 import { defaultLayoutIcons, DefaultVideoLayout } from "@vidstack/react/player/layouts/default";
 import { forwardRef, useState, useRef, useImperativeHandle, useEffect } from "react";
 import { Server, Loader2, Crop, RefreshCw, AlertTriangle } from "lucide-react";
@@ -24,25 +24,13 @@ interface VideoPlayerProps {
 }
 
 const PIPToggle = () => {
-  const player = useMediaPlayer();
-
-  const togglePIP = async () => {
-    if (!player) return;
-    try {
-      if (player.state.pictureInPicture) {
-        await player.exitPictureInPicture();
-      } else {
-        await player.enterPictureInPicture();
-      }
-    } catch (e) {
-      console.error("Failed to toggle PiP:", e);
-    }
-  };
+  const isPictureInPicture = useMediaState("pictureInPicture");
 
   return (
-    <button
-      onClick={togglePIP}
-      className="vds-button h-full aspect-square flex items-center justify-center text-slate-300 hover:text-white transition-colors duration-150 mr-1.5 cursor-pointer"
+    <PIPButton
+      className={`vds-button h-full aspect-square flex items-center justify-center transition-colors duration-150 mr-1.5 cursor-pointer ${
+        isPictureInPicture ? "text-violet-400 hover:text-violet-300" : "text-slate-300 hover:text-white"
+      }`}
       title="Picture-in-Picture"
       aria-label="Toggle Picture-in-Picture"
     >
@@ -50,7 +38,7 @@ const PIPToggle = () => {
         <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" />
         <rect x="13" y="11" width="7" height="5" rx="1" fill="currentColor" stroke="currentColor" />
       </svg>
-    </button>
+    </PIPButton>
   );
 };
 
@@ -220,8 +208,11 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
           <DefaultVideoLayout
             thumbnails={thumbnails}
             icons={defaultLayoutIcons}
+            menuGroup="bottom"
+            smallLayoutWhen={false}
             slots={{
               timeSlider: null,
+              googleCastButton: null,
               pipButton: null,
               beforeFullscreenButton: (
                 <div className="flex items-center">
@@ -306,8 +297,8 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
             }}
           />
 
-          {/* ABC Sports watermark hidden by request. Change false to true to restore it. */}
-          {false && (
+          {/* ABC Sports watermark shown in the top-right corner. */}
+          {true && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 select-none animate-in fade-in duration-500">
               <div className={`relative pointer-events-none transition-all duration-350 ${
                 objectFit === "contain"
