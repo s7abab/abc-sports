@@ -3,10 +3,7 @@
 import { MediaPlayer, MediaProvider, isHLSProvider, useMediaPlayer, useMediaStore, type MediaPlayerInstance, type MediaProviderAdapter } from "@vidstack/react";
 import { defaultLayoutIcons, DefaultVideoLayout } from "@vidstack/react/player/layouts/default";
 import { forwardRef, useState, useRef, useImperativeHandle, useEffect } from "react";
-import { MessageSquare, MessageSquareOff, Server, Loader2, Crop, RefreshCw, AlertTriangle } from "lucide-react";
-import { LiveMatchChat } from "@/components/live-match-chat";
-import { FloatingReactions } from "@/components/floating-reactions";
-import { FloatingChat } from "@/components/floating-chat";
+import { Server, Loader2, Crop, RefreshCw, AlertTriangle } from "lucide-react";
 import { useLiveStreamController } from "@/hooks/use-live-stream-controller";
 import type { StreamServerId } from "@/lib/stream-health";
 
@@ -19,15 +16,11 @@ interface VideoPlayerProps {
   children?: React.ReactNode;
   muted?: boolean;
   autoPlay?: boolean;
-  isChatOpen?: boolean;
-  onToggleChat?: () => void;
   playerId?: string;
-  isMobile?: boolean;
   servers?: Array<{ id: StreamServerId; name: string }>;
   activeServerId?: StreamServerId | null;
   onServerChange?: (id: StreamServerId) => void;
   isAutoSwitchEnabled?: boolean;
-  isFloatingEnabled?: boolean;
 }
 
 const PIPToggle = () => {
@@ -62,7 +55,7 @@ const PIPToggle = () => {
 };
 
 export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
-  ({ src, title, thumbnails, onPlay, onPause, children, muted = false, autoPlay = false, isChatOpen = false, onToggleChat, playerId, isMobile = false, servers = [], activeServerId, onServerChange, isAutoSwitchEnabled = true, isFloatingEnabled = false }, ref) => {
+  ({ src, title, thumbnails, onPlay, onPause, children, muted = false, autoPlay = false, playerId, servers = [], activeServerId, onServerChange, isAutoSwitchEnabled = true }, ref) => {
     const [objectFit, setObjectFit] = useState<"contain" | "cover" | "fill">("contain");
     const [isServerMenuOpen, setIsServerMenuOpen] = useState(false);
     const playerRef = useRef<MediaPlayerInstance>(null);
@@ -88,7 +81,6 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
     useImperativeHandle(ref, () => playerRef.current!);
 
     const {
-      fullscreen,
       waiting,
       error,
       playing,
@@ -197,9 +189,6 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
       }
     };
 
-    const canUseOverlayChat = isMobile || fullscreen;
-    const showOverlayChat = isChatOpen && canUseOverlayChat;
-
     return (
       <div 
         onClick={() => {
@@ -291,20 +280,6 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                     </div>
                   )}
 
-                  {onToggleChat && (
-                    <button
-                      onClick={onToggleChat}
-                      className="vds-button h-full aspect-square flex items-center justify-center text-slate-300 hover:text-white transition-colors duration-150 mr-1.5 cursor-pointer"
-                      title={isChatOpen ? "Hide Chat" : "Show Chat"}
-                      aria-label="Toggle chat layout"
-                    >
-                      {isChatOpen ? (
-                        <MessageSquareOff className="w-[18px] h-[18px] text-emerald-400" />
-                      ) : (
-                        <MessageSquare className="w-[18px] h-[18px]" />
-                      )}
-                    </button>
-                  )}
                   <PIPToggle />
                    <button
                     onClick={toggleFit}
@@ -352,28 +327,6 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                 </div>
               </div>
             </div>
-          )}
-
-          {/* Chat Overlay inside the video player (rendered when chat is open and either on mobile or fullscreen) */}
-          {playerId && showOverlayChat && (
-            <div
-              className="absolute inset-y-0 right-0 z-40 flex w-full flex-col pointer-events-auto transition-all duration-200 sm:w-80 md:w-96"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <LiveMatchChat
-                playerId={playerId}
-                roomTitle={title}
-                isOverlay={true}
-                onClose={onToggleChat}
-              />
-            </div>
-          )}
-
-          {isFloatingEnabled && (
-            <>
-              <FloatingReactions isChatOverlayOpen={showOverlayChat} />
-              <FloatingChat isChatOverlayOpen={showOverlayChat} />
-            </>
           )}
 
           {/* Slow connection overlay warning */}
@@ -492,24 +445,6 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                   <span className="truncate">Refresh</span>
                 </button>
 
-                {onToggleChat && (
-                  <button
-                    onClick={onToggleChat}
-                    className="flex min-w-0 flex-1 sm:flex-none sm:w-auto items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-white/5 hover:bg-white/10 active:scale-95 text-slate-200 hover:text-white text-[10px] sm:text-xs md:text-sm font-semibold rounded-lg sm:rounded-xl border border-white/10 transition-all duration-200 cursor-pointer"
-                  >
-                    {isChatOpen ? (
-                      <>
-                        <MessageSquareOff className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />
-                        <span className="truncate">Hide Chat</span>
-                      </>
-                    ) : (
-                      <>
-                        <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                        <span className="truncate">Chat</span>
-                      </>
-                    )}
-                  </button>
-                )}
               </div>
             </div>
           )}

@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useEffect, useState, useSyncExternalStore } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { VideoPlayer } from "@/components/video-player";
-import { LiveMatchChat } from "@/components/live-match-chat";
 import { Loader2, Server } from "lucide-react";
 import type { MediaPlayerInstance } from "@vidstack/react";
 
@@ -14,18 +13,6 @@ interface PlayerConfig {
   servers: Record<string, { name: string; url: string }>;
 }
 
-function useIsMobile() {
-  return useSyncExternalStore(
-    (onStoreChange) => {
-      const media = window.matchMedia("(max-width: 1023px)");
-      media.addEventListener("change", onStoreChange);
-      return () => media.removeEventListener("change", onStoreChange);
-    },
-    () => window.matchMedia("(max-width: 1023px)").matches,
-    () => false
-  );
-}
-
 export default function SinglePlayerPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = React.use(params);
   const playerId = resolvedParams.id;
@@ -34,10 +21,8 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
   const [activeServerId, setActiveServerId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-  const [isChatOpen, setIsChatOpen] = useState(false);
   const [whatsappUrl, setWhatsappUrl] = useState("");
   const videoPlayerRef = React.useRef<MediaPlayerInstance>(null);
-  const isMobile = useIsMobile();
   const [isAutoSwitchEnabled, setIsAutoSwitchEnabled] = useState<boolean>(() => {
     if (typeof window === "undefined") {
       return true;
@@ -50,8 +35,6 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
     setIsAutoSwitchEnabled(next);
     localStorage.setItem("auto_switch_server_enabled", String(next));
   };
-
-  const toggleChat = () => setIsChatOpen((prev) => !prev);
 
   useEffect(() => {
     async function fetchPlayer() {
@@ -181,32 +164,18 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
           </div>
         ) : player && currentStreamUrl ? (
           <div className="flex flex-col gap-2 w-full">
-            <div className={`grid w-full gap-4 items-start transition-all duration-300 ${
-              isChatOpen
-                ? "lg:grid-cols-[minmax(0,1fr)_24rem] grid-cols-1"
-                : "grid-cols-1"
-            }`}>
-              <div className="flex min-w-0 flex-col gap-4">
-                <VideoPlayer
-                  ref={videoPlayerRef}
-                  src={currentStreamUrl}
-                  title={player.name}
-                  autoPlay={true}
-                  isChatOpen={isChatOpen}
-                  onToggleChat={toggleChat}
-                  playerId={playerId}
-                  isMobile={isMobile}
-                  servers={availableServers}
-                  activeServerId={activeServerId}
-                  onServerChange={switchServer}
-                  isAutoSwitchEnabled={isAutoSwitchEnabled}
-                />
-              </div>
-
-              {/* Side Chat: Only visible on desktop when toggled open */}
-              <div className={`hidden lg:block ${isChatOpen ? "lg:block" : "lg:hidden"}`}>
-                <LiveMatchChat playerId={playerId} roomTitle={player.name} />
-              </div>
+            <div className="flex min-w-0 flex-col gap-4">
+              <VideoPlayer
+                ref={videoPlayerRef}
+                src={currentStreamUrl}
+                title={player.name}
+                autoPlay={true}
+                playerId={playerId}
+                servers={availableServers}
+                activeServerId={activeServerId}
+                onServerChange={switchServer}
+                isAutoSwitchEnabled={isAutoSwitchEnabled}
+              />
             </div>
 
             {/* Settings and Controls Card */}
@@ -271,13 +240,6 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
                 </div>
               </div>
             </div>
-
-            {/* Bottom Chat: visible when the overlay/side chat is closed */}
-            {!isChatOpen && (
-              <div className="w-full">
-                <LiveMatchChat playerId={playerId} roomTitle={player.name} />
-              </div>
-            )}
           </div>
         ) : (
           <div className="aspect-video w-full rounded-2xl bg-black/40 border border-dashed border-white/5 flex flex-col items-center justify-center p-6 text-center select-none text-slate-500">

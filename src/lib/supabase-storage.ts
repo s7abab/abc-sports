@@ -53,26 +53,6 @@ interface Database {
         Update: Partial<Database["public"]["Tables"]["players"]["Insert"]>;
         Relationships: [];
       };
-      chat_messages: {
-        Row: {
-          id: string;
-          player_id: string;
-          author: string;
-          body: string;
-          kind: string;
-          created_at: string;
-        };
-        Insert: {
-          id: string;
-          player_id: string;
-          author: string;
-          body: string;
-          kind: string;
-          created_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["chat_messages"]["Insert"]>;
-        Relationships: [];
-      };
       app_settings: {
         Row: {
           id: string;
