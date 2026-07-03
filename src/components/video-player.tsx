@@ -44,7 +44,10 @@ const PIPToggle = () => {
 
 export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
   ({ src, title, thumbnails, onPlay, onPause, children, muted = false, autoPlay = false, playerId, servers = [], activeServerId, onServerChange, isAutoSwitchEnabled = true }, ref) => {
-    const [objectFit, setObjectFit] = useState<"contain" | "cover" | "fill">("contain");
+    const [objectFit, setObjectFit] = useState<"contain" | "cover" | "fill">(() => {
+      if (typeof window === "undefined") return "contain";
+      return window.matchMedia("(max-width: 640px), (pointer: coarse)").matches ? "fill" : "contain";
+    });
     const [isServerMenuOpen, setIsServerMenuOpen] = useState(false);
     const playerRef = useRef<MediaPlayerInstance>(null);
 
