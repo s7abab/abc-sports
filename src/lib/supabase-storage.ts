@@ -67,6 +67,34 @@ interface Database {
         Update: Partial<Database["public"]["Tables"]["app_settings"]["Insert"]>;
         Relationships: [];
       };
+      broadcast_messages: {
+        Row: {
+          id: string;
+          title: string;
+          description: string;
+          action_label: string;
+          cancel_label: string;
+          action_url: string;
+          image_urls: Json;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          title: string;
+          description: string;
+          action_label: string;
+          cancel_label: string;
+          action_url: string;
+          image_urls: Json;
+          is_active: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["broadcast_messages"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

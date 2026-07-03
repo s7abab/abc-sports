@@ -4,13 +4,14 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { VideoPlayer } from "@/components/video-player";
 import type { MatchConfig } from "@/lib/match-storage";
+import type { BroadcastMessage } from "@/lib/broadcast-storage";
 import {
   deriveRuntimeMatchStatus,
   formatMatchDate,
   getLocalDateKey,
   type MatchStatus,
 } from "@/lib/match-utils";
-import { Tv, Sparkles, Loader2, Copy, Check, Settings, Save, ExternalLink, X, Plus, CalendarPlus, Pencil, Trash2, RotateCcw } from "lucide-react";
+import { Tv, Sparkles, Loader2, Copy, Check, Settings, Save, ExternalLink, X, Plus, CalendarPlus, Pencil, Trash2, RotateCcw, Megaphone, Send, Image as ImageIcon } from "lucide-react";
 
 interface PlayerServer {
   name: string;
@@ -106,6 +107,16 @@ export default function DashboardPage() {
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [settingsError, setSettingsError] = useState("");
   const [settingsSuccess, setSettingsSuccess] = useState(false);
+  const [broadcastTitle, setBroadcastTitle] = useState("");
+  const [broadcastDescription, setBroadcastDescription] = useState("");
+  const [broadcastActionLabel, setBroadcastActionLabel] = useState("Open");
+  const [broadcastCancelLabel, setBroadcastCancelLabel] = useState("Close");
+  const [broadcastActionUrl, setBroadcastActionUrl] = useState("");
+  const [broadcastImageUrls, setBroadcastImageUrls] = useState(["", "", ""]);
+  const [broadcastIsActive, setBroadcastIsActive] = useState(false);
+  const [isSavingBroadcast, setIsSavingBroadcast] = useState(false);
+  const [broadcastError, setBroadcastError] = useState("");
+  const [broadcastSuccess, setBroadcastSuccess] = useState(false);
   const [activeMatchFilter, setActiveMatchFilter] = useState<MatchStatus>("today");
   const [editingMatch, setEditingMatch] = useState<MatchConfig | null>(null);
   const [isSavingMatch, setIsSavingMatch] = useState(false);
@@ -204,9 +215,33 @@ export default function DashboardPage() {
       }
     }
 
+    async function fetchBroadcast() {
+      try {
+        const response = await fetch("/api/broadcast", { cache: "no-store" });
+        if (!response.ok) return;
+
+        const data = (await response.json()) as BroadcastMessage | null;
+        if (!data) {
+          setBroadcastIsActive(false);
+          return;
+        }
+
+        setBroadcastTitle(data.title || "");
+        setBroadcastDescription(data.description || "");
+        setBroadcastActionLabel(data.actionLabel || "Open");
+        setBroadcastCancelLabel(data.cancelLabel || "Close");
+        setBroadcastActionUrl(data.actionUrl || "");
+        setBroadcastImageUrls([data.imageUrls?.[0] || "", data.imageUrls?.[1] || "", data.imageUrls?.[2] || ""]);
+        setBroadcastIsActive(Boolean(data.isActive));
+      } catch (err) {
+        console.error("Error loading broadcast message:", err);
+      }
+    }
+
     fetchPlayers();
     fetchMatches();
     fetchSettings();
+    fetchBroadcast();
   }, []);
 
   useEffect(() => {
@@ -280,6 +315,121 @@ export default function DashboardPage() {
       setSettingsError("An error occurred while saving settings.");
     } finally {
       setIsSavingSettings(false);
+    }
+  };
+
+  const updateBroadcastImageUrl = (index: number, value: string) => {
+    setBroadcastImageUrls((prev) => {
+      const next = [...prev];
+      next[index] = value;
+      return next;
+    });
+  };
+
+  const validateBroadcastUrl = (value: string) => {
+    if (!value.trim()) return true;
+    try {
+      const parsed = new URL(value);
+      return ["http:", "https:"].includes(parsed.protocol);
+    } catch {
+      return false;
+    }
+  };
+
+  const handleSaveBroadcast = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBroadcastError("");
+    setBroadcastSuccess(false);
+    setIsSavingBroadcast(true);
+
+    const nextTitle = broadcastTitle.trim();
+    const nextDescription = broadcastDescription.trim();
+    const nextActionLabel = broadcastActionLabel.trim() || "Open";
+    const nextCancelLabel = broadcastCancelLabel.trim() || "Close";
+    const nextActionUrl = broadcastActionUrl.trim();
+    const nextImageUrls = broadcastImageUrls.map((url) => url.trim()).filter(Boolean);
+
+    if (!validateBroadcastUrl(nextActionUrl)) {
+      setBroadcastError("Please enter a valid action link starting with http/https.");
+      setIsSavingBroadcast(false);
+      return;
+    }
+
+    if (nextImageUrls.some((url) => !validateBroadcastUrl(url))) {
+      setBroadcastError("Please enter valid image URLs starting with http/https.");
+      setIsSavingBroadcast(false);
+      return;
+    }
+
+    if (broadcastIsActive && !nextTitle && !nextDescription && nextImageUrls.length === 0 && !nextActionUrl) {
+      setBroadcastError("Add a title, description, image, or action link before broadcasting.");
+      setIsSavingBroadcast(false);
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/broadcast", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: nextTitle,
+          description: nextDescription,
+          actionLabel: nextActionLabel,
+          cancelLabel: nextCancelLabel,
+          actionUrl: nextActionUrl,
+          imageUrls: nextImageUrls,
+          isActive: broadcastIsActive,
+        }),
+      });
+
+      if (response.ok) {
+        const data = (await response.json()) as { broadcast?: BroadcastMessage };
+        if (data.broadcast) {
+          setBroadcastTitle(data.broadcast.title || "");
+          setBroadcastDescription(data.broadcast.description || "");
+          setBroadcastActionLabel(data.broadcast.actionLabel || "Open");
+          setBroadcastCancelLabel(data.broadcast.cancelLabel || "Close");
+          setBroadcastActionUrl(data.broadcast.actionUrl || "");
+          setBroadcastImageUrls([
+            data.broadcast.imageUrls?.[0] || "",
+            data.broadcast.imageUrls?.[1] || "",
+            data.broadcast.imageUrls?.[2] || "",
+          ]);
+          setBroadcastIsActive(Boolean(data.broadcast.isActive));
+        }
+        setBroadcastSuccess(true);
+        setTimeout(() => setBroadcastSuccess(false), 3000);
+      } else {
+        const data = await response.json();
+        setBroadcastError(data.error || "Failed to save broadcast message.");
+      }
+    } catch (err) {
+      setBroadcastError("An error occurred while saving the broadcast message.");
+    } finally {
+      setIsSavingBroadcast(false);
+    }
+  };
+
+  const handleDisableBroadcast = async () => {
+    setBroadcastError("");
+    setBroadcastSuccess(false);
+    setIsSavingBroadcast(true);
+
+    try {
+      const response = await fetch("/api/broadcast", { method: "DELETE" });
+      if (!response.ok) {
+        const data = await response.json();
+        setBroadcastError(data.error || "Failed to disable broadcast message.");
+        return;
+      }
+
+      setBroadcastIsActive(false);
+      setBroadcastSuccess(true);
+      setTimeout(() => setBroadcastSuccess(false), 3000);
+    } catch (err) {
+      setBroadcastError("An error occurred while disabling the broadcast message.");
+    } finally {
+      setIsSavingBroadcast(false);
     }
   };
 
@@ -1264,7 +1414,7 @@ export default function DashboardPage() {
         )}
 
         {activeTab === "settings" && (
-          <section className="max-w-xl mx-auto w-full animate-in fade-in duration-300">
+          <section className="mx-auto w-full max-w-3xl animate-in fade-in duration-300">
             <div className="rounded-2xl border border-white/5 bg-[#0f0f13] p-6 shadow-xl shadow-black/10">
               <div className="flex items-center gap-2 pb-4 border-b border-white/5 mb-6">
                 <Settings className="h-5 w-5 text-violet-500" />
@@ -1314,6 +1464,174 @@ export default function DashboardPage() {
                       <Save className="h-3.5 w-3.5" />
                     )}
                     Save Settings
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <div className="mt-5 rounded-2xl border border-white/5 bg-[#0f0f13] p-6 shadow-xl shadow-black/10">
+              <div className="flex items-center gap-2 pb-4 border-b border-white/5 mb-6">
+                <Megaphone className="h-5 w-5 text-amber-400" />
+                <h2 className="text-xs font-bold uppercase tracking-wider text-white">
+                  Broadcast Message
+                </h2>
+              </div>
+
+              <form onSubmit={handleSaveBroadcast} className="space-y-4">
+                <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                  <div>
+                    <p className="text-sm font-semibold text-white">Broadcast visibility</p>
+                    <p className="mt-1 text-[10px] text-slate-400">
+                      When enabled, the popup appears on all public client pages.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setBroadcastIsActive((prev) => !prev)}
+                    className={`relative inline-flex h-7 w-12 items-center rounded-full border transition ${
+                      broadcastIsActive
+                        ? "border-amber-400/40 bg-amber-400"
+                        : "border-white/10 bg-slate-800"
+                    }`}
+                    aria-pressed={broadcastIsActive}
+                    aria-label="Toggle broadcast visibility"
+                  >
+                    <span
+                      className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition ${
+                        broadcastIsActive ? "translate-x-5" : "translate-x-0.5"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="space-y-1.5 block md:col-span-2">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                      Title
+                    </span>
+                    <input
+                      type="text"
+                      value={broadcastTitle}
+                      onChange={(e) => setBroadcastTitle(e.target.value)}
+                      placeholder="Breaking update"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition focus:border-amber-400/50"
+                    />
+                  </label>
+
+                  <label className="space-y-1.5 block md:col-span-2">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                      Description
+                    </span>
+                    <textarea
+                      value={broadcastDescription}
+                      onChange={(e) => setBroadcastDescription(e.target.value)}
+                      rows={4}
+                      placeholder="Tell viewers what changed."
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition focus:border-amber-400/50"
+                    />
+                  </label>
+
+                  <label className="space-y-1.5 block">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                      Action button label
+                    </span>
+                    <input
+                      type="text"
+                      value={broadcastActionLabel}
+                      onChange={(e) => setBroadcastActionLabel(e.target.value)}
+                      placeholder="Open link"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition focus:border-amber-400/50"
+                    />
+                  </label>
+
+                  <label className="space-y-1.5 block">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                      Action link
+                    </span>
+                    <input
+                      type="url"
+                      value={broadcastActionUrl}
+                      onChange={(e) => setBroadcastActionUrl(e.target.value)}
+                      placeholder="https://example.com"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition focus:border-amber-400/50"
+                    />
+                  </label>
+
+                  <label className="space-y-1.5 block">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                      Cancel button label
+                    </span>
+                    <input
+                      type="text"
+                      value={broadcastCancelLabel}
+                      onChange={(e) => setBroadcastCancelLabel(e.target.value)}
+                      placeholder="Close"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition focus:border-amber-400/50"
+                    />
+                  </label>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <ImageIcon className="h-4 w-4 text-amber-300" />
+                    <p className="text-xs font-semibold uppercase tracking-wider text-white">
+                      Photos
+                    </p>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-3">
+                    {broadcastImageUrls.map((url, index) => (
+                      <label key={`broadcast-image-${index}`} className="space-y-1.5 block">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                          Photo {index + 1}
+                        </span>
+                        <input
+                          type="url"
+                          value={url}
+                          onChange={(e) => updateBroadcastImageUrl(index, e.target.value)}
+                          placeholder="https://example.com/photo.jpg"
+                          className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition focus:border-amber-400/50"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {broadcastError && (
+                  <p className="text-xs font-medium text-rose-400 bg-rose-500/5 py-2 px-3 rounded-lg border border-rose-500/10">
+                    {broadcastError}
+                  </p>
+                )}
+
+                {broadcastSuccess && (
+                  <p className="text-xs font-medium text-emerald-400 bg-emerald-500/5 py-2 px-3 rounded-lg border border-emerald-500/10">
+                    Broadcast message saved successfully.
+                  </p>
+                )}
+
+                <div className="flex flex-wrap justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleDisableBroadcast}
+                    disabled={isSavingBroadcast}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold text-slate-300 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    Disable broadcast
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={isSavingBroadcast}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-5 py-2 text-xs font-bold text-white shadow-lg shadow-amber-500/10 transition hover:from-amber-400 hover:to-orange-400 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {isSavingBroadcast ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Send className="h-3.5 w-3.5" />
+                    )}
+                    {broadcastIsActive ? "Publish broadcast" : "Save draft"}
                   </button>
                 </div>
               </form>
