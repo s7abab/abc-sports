@@ -91,7 +91,13 @@ export function useLiveStreamController({
   const bufferAhead = getBufferAhead(currentTime, bufferedEnd);
   const liveLatency = getLiveLatency(currentTime, seekableEnd);
   const allStreamsFailed =
-    servers.length > 0 && servers.every((server) => failedServerIds.has(server.id));
+    isAutoSwitchEnabled &&
+    servers.length > 0 &&
+    servers.every((server) => failedServerIds.has(server.id));
+  const visibleFailedServerIds = useMemo(
+    () => (isAutoSwitchEnabled ? failedServerIds : new Set<StreamServerId>()),
+    [failedServerIds, isAutoSwitchEnabled]
+  );
 
   const finalSrc = useMemo(() => src, [src]);
 
@@ -104,7 +110,7 @@ export function useLiveStreamController({
       targetServerName?: string;
       reason?: string;
     }) => {
-      if (!playerId) return;
+      if (!isAutoSwitchEnabled || !playerId) return;
 
       const key = [
         payload.type,
@@ -140,7 +146,7 @@ export function useLiveStreamController({
         // Health reporting must never affect playback.
       });
     },
-    [playerId]
+    [isAutoSwitchEnabled, playerId]
   );
 
   const ensureScore = useCallback((serverId: StreamServerId) => {
@@ -154,6 +160,8 @@ export function useLiveStreamController({
 
   const updateScore = useCallback(
     (serverId: StreamServerId, delta: number, patch?: Partial<StreamServerScore>) => {
+      if (!isAutoSwitchEnabled) return;
+
       const current = ensureScore(serverId);
       scoresRef.current.set(serverId, {
         ...current,
@@ -161,11 +169,13 @@ export function useLiveStreamController({
         score: clampServerScore(current.score + delta),
       });
     },
-    [ensureScore]
+    [ensureScore, isAutoSwitchEnabled]
   );
 
   const markServerFailed = useCallback(
     (serverId: StreamServerId, penalty = -30) => {
+      if (!isAutoSwitchEnabled) return;
+
       const now = Date.now();
       const current = ensureScore(serverId);
 
@@ -191,7 +201,7 @@ export function useLiveStreamController({
         reason: "Playback health dropped below recovery threshold.",
       });
     },
-    [ensureScore, reportHealthEvent, servers]
+    [ensureScore, isAutoSwitchEnabled, reportHealthEvent, servers]
   );
 
   const switchToBestServer = useCallback(
@@ -261,6 +271,7 @@ export function useLiveStreamController({
   const handleManualServerChange = useCallback(
     (serverId: StreamServerId) => {
       manualLockUntilRef.current = Date.now() + STREAM_HEALTH_TARGETS.manualSelectionLockMs;
+      scoresRef.current.delete(serverId);
       setFailedServerIds((prev) => {
         const next = new Set(prev);
         next.delete(serverId);
@@ -277,6 +288,15 @@ export function useLiveStreamController({
 
       hlsFailureBurstRef.current += 1;
       const isFatal = Boolean(event.fatal);
+
+      if (!isAutoSwitchEnabled) {
+        if (isFatal || (hlsFailureBurstRef.current >= 8 && !reloadedDuringStallRef.current)) {
+          reloadedDuringStallRef.current = true;
+          setRetryCount((prev) => prev + 1);
+        }
+        return;
+      }
+
       const penalty = isFatal ? -35 : -2;
 
       updateScore(activeServerId, penalty);
@@ -294,8 +314,24 @@ export function useLiveStreamController({
         setRetryCount((prev) => prev + 1);
       }
     },
-    [activeServerId, markServerFailed, switchToBestServer, updateScore]
+    [activeServerId, isAutoSwitchEnabled, markServerFailed, switchToBestServer, updateScore]
   );
+
+  useEffect(() => {
+    if (isAutoSwitchEnabled) return;
+
+    scoresRef.current.clear();
+    lastReportedEventRef.current.clear();
+
+    const resetTimer = window.setTimeout(() => {
+      setFailedServerIds(new Set());
+      setCountdown(null);
+      setNextServerName(null);
+      setAutoSwitchingTo(null);
+    }, 0);
+
+    return () => window.clearTimeout(resetTimer);
+  }, [isAutoSwitchEnabled]);
 
   useEffect(() => {
     srcStartedAtRef.current = Date.now();
@@ -320,9 +356,6 @@ export function useLiveStreamController({
       if (!activeServerId) return;
 
       if ((playing || canPlay) && !waiting && !error) {
-        const current = ensureScore(activeServerId);
-        const now = Date.now();
-
         hlsFailureBurstRef.current = 0;
         setFailedServerIds((prev) => {
           if (!prev.has(activeServerId)) return prev;
@@ -330,6 +363,14 @@ export function useLiveStreamController({
           next.delete(activeServerId);
           return next;
         });
+
+        if (!isAutoSwitchEnabled) {
+          reportedRecoveryRef.current = true;
+          return;
+        }
+
+        const current = ensureScore(activeServerId);
+        const now = Date.now();
 
         if (now - current.lastHealthyAt >= STREAM_HEALTH_TARGETS.healthyRewardIntervalMs) {
           scoresRef.current.set(activeServerId, {
@@ -352,7 +393,7 @@ export function useLiveStreamController({
     }, 1_000);
 
     return () => window.clearInterval(intervalId);
-  }, [activeServerId, canPlay, ensureScore, error, playing, reportHealthEvent, servers, waiting]);
+  }, [activeServerId, canPlay, ensureScore, error, isAutoSwitchEnabled, playing, reportHealthEvent, servers, waiting]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -374,10 +415,16 @@ export function useLiveStreamController({
       if (error) {
         if (handledErrorForSrcRef.current !== src) {
           handledErrorForSrcRef.current = src;
-          markServerFailed(activeServerId, -35);
+          if (isAutoSwitchEnabled) {
+            markServerFailed(activeServerId, -35);
+          } else {
+            setRetryCount((prev) => prev + 1);
+          }
         }
         setPhase("failed");
-        switchToBestServer("error");
+        if (isAutoSwitchEnabled) {
+          switchToBestServer("error");
+        }
         return;
       }
 
@@ -389,11 +436,14 @@ export function useLiveStreamController({
         }
 
         handledStartupFailureForSrcRef.current = startupFailureKey;
-        markServerFailed(activeServerId, -25);
         setCountdown(null);
         setNextServerName(null);
 
-        if (!switchToBestServer("startup")) {
+        if (isAutoSwitchEnabled) {
+          markServerFailed(activeServerId, -25);
+        }
+
+        if (!isAutoSwitchEnabled || !switchToBestServer("startup")) {
           setPhase("degraded");
         }
         return;
@@ -418,12 +468,14 @@ export function useLiveStreamController({
 
       if (stallStartedAtRef.current === null) {
         stallStartedAtRef.current = now;
-        const current = ensureScore(activeServerId);
-        scoresRef.current.set(activeServerId, {
-          ...current,
-          stalls: current.stalls + 1,
-          score: clampServerScore(current.score - 8),
-        });
+        if (isAutoSwitchEnabled) {
+          const current = ensureScore(activeServerId);
+          scoresRef.current.set(activeServerId, {
+            ...current,
+            stalls: current.stalls + 1,
+            score: clampServerScore(current.score - 8),
+          });
+        }
       }
 
       const stallMs = now - stallStartedAtRef.current;
@@ -438,25 +490,25 @@ export function useLiveStreamController({
       }
 
       if (stallMs >= STREAM_HEALTH_TARGETS.switchAfterStallMs) {
-        markServerFailed(activeServerId, -18);
         setCountdown(null);
         setNextServerName(null);
 
-        if (!switchToBestServer("stall")) {
+        if (isAutoSwitchEnabled) {
+          markServerFailed(activeServerId, -18);
+        }
+
+        if (!isAutoSwitchEnabled || !switchToBestServer("stall")) {
           setPhase("degraded");
         }
         return;
       }
 
-      const nextServer = getNextHealthyServer(
-        servers,
-        activeServerId,
-        scoresRef.current,
-        now
-      );
+      const nextServer = isAutoSwitchEnabled
+        ? getNextHealthyServer(servers, activeServerId, scoresRef.current, now)
+        : null;
 
-      setCountdown(isAutoSwitchEnabled && nextServer ? secondsToSwitch : null);
-      setNextServerName(isAutoSwitchEnabled && nextServer ? nextServer.name : null);
+      setCountdown(nextServer ? secondsToSwitch : null);
+      setNextServerName(nextServer ? nextServer.name : null);
       setPhase(stallMs >= STREAM_HEALTH_TARGETS.reloadAfterStallMs ? "degraded" : "recovering");
     }, 500);
 
@@ -509,6 +561,16 @@ export function useLiveStreamController({
       return "We tried all available stream servers but none of them are responding right now. Please refresh or select a server manually.";
     }
 
+    if (!isAutoSwitchEnabled) {
+      if (phase === "degraded" || phase === "failed") {
+        return "This source is having trouble. Refresh it or choose another server manually.";
+      }
+
+      if (phase === "recovering" || phase === "buffering") {
+        return "Building a safer live buffer for this source. You can wait, refresh, or choose another server.";
+      }
+    }
+
     if (phase === "switching" && autoSwitchingTo) {
       return `Loading ${autoSwitchingTo} because the current stream became unstable.`;
     }
@@ -526,14 +588,14 @@ export function useLiveStreamController({
     }
 
     return "The stream is taking longer than usual to load. You can wait, refresh, or choose another server.";
-  }, [allStreamsFailed, autoSwitchingTo, countdown, nextServerName, phase]);
+  }, [allStreamsFailed, autoSwitchingTo, countdown, isAutoSwitchEnabled, nextServerName, phase]);
 
   return {
     allStreamsFailed,
     autoSwitchingTo,
     bufferAhead,
     countdown,
-    failedServerIds,
+    failedServerIds: visibleFailedServerIds,
     finalSrc,
     handleManualServerChange,
     handleRefresh,

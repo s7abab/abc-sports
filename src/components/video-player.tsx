@@ -10,6 +10,7 @@ import type { StreamServerId } from "@/lib/stream-health";
 interface VideoPlayerProps {
   src: string;
   title: string;
+  isIframe?: boolean;
   thumbnails?: string;
   onPlay?: () => void;
   onPause?: () => void;
@@ -43,7 +44,7 @@ const PIPToggle = () => {
 };
 
 export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
-  ({ src, title, thumbnails, onPlay, onPause, children, muted = false, autoPlay = false, playerId, servers = [], activeServerId, onServerChange, isAutoSwitchEnabled = true }, ref) => {
+  ({ src, title, isIframe = false, thumbnails, onPlay, onPause, children, muted = false, autoPlay = false, playerId, servers = [], activeServerId, onServerChange, isAutoSwitchEnabled = true }, ref) => {
     const [objectFit, setObjectFit] = useState<"contain" | "cover" | "fill">(() => {
       if (typeof window === "undefined") return "contain";
       return window.matchMedia("(max-width: 640px), (pointer: coarse)").matches ? "fill" : "contain";
@@ -103,7 +104,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
       servers,
       activeServerId: activeServerId ?? null,
       onServerChange,
-      isAutoSwitchEnabled,
+      isAutoSwitchEnabled: isAutoSwitchEnabled && !isIframe,
       canPlay,
       waiting,
       playing,
@@ -142,6 +143,42 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
         return "contain";
       });
     };
+
+    if (isIframe) {
+      return (
+        <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black/95 border border-white/10 shadow-2xl backdrop-blur-md transition-all duration-300 hover:border-violet-500/30 group">
+          <iframe
+            key={src}
+            src={src}
+            title={title}
+            className="h-full w-full border-0 bg-black"
+            allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+            allowFullScreen
+            loading="eager"
+            referrerPolicy="no-referrer-when-downgrade"
+            sandbox="allow-same-origin allow-scripts allow-forms allow-presentation allow-popups"
+          />
+
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 select-none animate-in fade-in duration-500">
+            <div className="relative pointer-events-none transition-all duration-350 w-full h-full">
+              <div className="absolute top-[1%] right-[clamp(10px,1.5vw,20px)] pointer-events-none">
+                <div className="flex items-center gap-[clamp(4px,0.5vw,8px)] px-[clamp(10px,1.2vw,16px)] py-[clamp(5px,0.8vw,10px)] rounded-[clamp(6px,0.8vw,10px)] bg-slate-950/95 backdrop-blur-md border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.55)] transition-all duration-300 hover:border-violet-500/30">
+                  <div className="w-[clamp(14px,1.5vw,18px)] h-[clamp(14px,1.5vw,18px)] rounded-full bg-gradient-to-tr from-violet-600 to-fuchsia-600 flex items-center justify-center text-[clamp(8px,1vw,10px)] font-black text-white shrink-0 shadow-sm tracking-tighter select-none">
+                    A
+                  </div>
+                  <span className="text-[clamp(10px,1.2vw,14px)] font-black tracking-widest uppercase shrink-0 select-none">
+                    <span className="text-slate-100">abc</span>{" "}
+                    <span className="text-violet-400">sports</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {children}
+        </div>
+      );
+    }
 
     const handleProviderChange = (provider: MediaProviderAdapter | null) => {
       if (isHLSProvider(provider)) {
@@ -393,6 +430,8 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                   <span className="sm:hidden">
                     {allStreamsFailed
                       ? "All servers unavailable. Refresh or choose one."
+                      : !isAutoSwitchEnabled
+                      ? statusMessage
                       : countdown !== null && nextServerName
                       ? `Switching to ${nextServerName} in ${countdown}s if needed.`
                       : "Building buffer. Wait, refresh, or switch server."}

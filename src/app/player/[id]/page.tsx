@@ -11,20 +11,21 @@ interface PlayerConfig {
   id: string;
   name: string;
   primaryServer: string;
-  servers: Record<string, { name: string; url: string }>;
+  servers: Record<string, { name: string; url: string; isIframe?: boolean }>;
 }
 
-function normalizeServers(value: unknown): Record<string, { name: string; url: string }> {
+function normalizeServers(value: unknown): PlayerConfig["servers"] {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {};
   }
 
-  return Object.entries(value as Record<string, unknown>).reduce<Record<string, { name: string; url: string }>>(
+  return Object.entries(value as Record<string, unknown>).reduce<PlayerConfig["servers"]>(
     (servers, [slot, server]) => {
-      const entry = server && typeof server === "object" ? (server as Partial<{ name: string; url: string }>) : {};
+      const entry = server && typeof server === "object" ? (server as Partial<{ name: string; url: string; isIframe?: boolean }>) : {};
       servers[slot] = {
         name: typeof entry.name === "string" ? entry.name : "",
         url: typeof entry.url === "string" ? entry.url : "",
+        isIframe: entry.isIframe === true,
       };
       return servers;
     },
@@ -240,7 +241,8 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
 
   const availableServers = player ? getAvailableServers(player.servers) : [];
 
-  const currentStreamUrl = player && activeServerId ? player.servers[activeServerId]?.url ?? "" : "";
+  const currentServer = player && activeServerId ? player.servers[activeServerId] ?? null : null;
+  const currentStreamUrl = currentServer?.url ?? "";
 
   const switchServer = (serverId: string) => {
     const wasFullscreen = Boolean(videoPlayerRef.current?.state.fullscreen || document.fullscreenElement);
@@ -316,6 +318,7 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
                   ref={videoPlayerRef}
                   src={currentStreamUrl}
                   title={player.name}
+                  isIframe={currentServer?.isIframe === true}
                   autoPlay={true}
                   playerId={playerId}
                   servers={availableServers}

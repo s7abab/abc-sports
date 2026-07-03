@@ -16,6 +16,7 @@ import { Tv, Sparkles, Loader2, Copy, Check, Settings, Save, ExternalLink, X, Pl
 interface PlayerServer {
   name: string;
   url: string;
+  isIframe?: boolean;
 }
 
 type PlayerServers = Record<string, PlayerServer>;
@@ -39,7 +40,7 @@ interface StreamHealthAlert {
 const DEFAULT_SERVER_SLOT_COUNT = 4;
 
 function createEmptyServer(): PlayerServer {
-  return { name: "", url: "" };
+  return { name: "", url: "", isIframe: false };
 }
 
 function sortServerIds(servers: PlayerServers) {
@@ -62,6 +63,7 @@ function createEditableServers(servers?: PlayerServers): PlayerServers {
     editable[slot] = {
       name: server?.name ?? "",
       url: server?.url ?? "",
+      isIframe: server?.isIframe === true,
     };
   });
 
@@ -77,6 +79,7 @@ function cleanServersForSave(servers: PlayerServers): PlayerServers {
     acc[slot] = {
       name,
       url,
+      isIframe: server.isIframe === true,
     };
     return acc;
   }, {});
@@ -493,6 +496,16 @@ export default function DashboardPage() {
     }));
   };
 
+  const handleInlineIframeToggle = (slot: string) => {
+    setInputUrls((prev) => ({
+      ...prev,
+      [slot]: {
+        ...(prev[slot] ?? createEmptyServer()),
+        isIframe: !(prev[slot]?.isIframe === true),
+      },
+    }));
+  };
+
   const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingPlayer) return;
@@ -569,6 +582,19 @@ export default function DashboardPage() {
         [slot]: {
             ...(prev[playerId]?.[slot] ?? createEmptyServer()),
           name: val,
+        },
+      },
+    }));
+  };
+
+  const handleBulkIframeToggle = (playerId: string, slot: string) => {
+    setBulkInputUrls((prev) => ({
+      ...prev,
+      [playerId]: {
+        ...prev[playerId],
+        [slot]: {
+          ...(prev[playerId]?.[slot] ?? createEmptyServer()),
+          isIframe: !(prev[playerId]?.[slot]?.isIframe === true),
         },
       },
     }));
@@ -715,13 +741,15 @@ export default function DashboardPage() {
     }
   };
 
-  const getActiveStreamUrl = (player: PlayerConfig): string => {
-    if (!player.servers) return "";
+  const getActiveServer = (player: PlayerConfig): PlayerServer | null => {
+    if (!player.servers) return null;
     const primary = player.primaryServer || "1";
     if (player.servers[primary]?.url) {
-      return player.servers[primary].url;
+      return player.servers[primary];
     }
-    return sortServerIds(player.servers).map((slot) => player.servers[slot]?.url).find(Boolean) || "";
+
+    const fallbackSlot = sortServerIds(player.servers).find((slot) => player.servers[slot]?.url);
+    return fallbackSlot ? player.servers[fallbackSlot] : null;
   };
 
   const TeamLogoThumb = ({
@@ -1293,7 +1321,11 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                {players.map((player) => (
+                {players.map((player) => {
+                  const activeServer = getActiveServer(player);
+                  const activeStreamUrl = activeServer?.url ?? "";
+
+                  return (
                   <div
                     key={player.id}
                     className="group flex flex-col bg-[#0f0f13] border border-white/5 rounded-2xl p-3 hover:border-violet-500/20 hover:shadow-xl hover:shadow-violet-950/5 transition-all duration-300 relative overflow-hidden"
@@ -1368,9 +1400,9 @@ export default function DashboardPage() {
                     </button>
 
                     {/* Status Badge */}
-                    {getActiveStreamUrl(player) ? (
+                    {activeStreamUrl ? (
                       <span className="text-[9px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full select-none">
-                        ACTIVE
+                        {activeServer?.isIframe ? "IFRAME" : "ACTIVE"}
                       </span>
                     ) : (
                       <span className="text-[9px] font-semibold text-slate-500 bg-white/5 px-2 py-0.5 rounded-full select-none">
@@ -1381,11 +1413,12 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Video Player or Offline Placeholder */}
-                {getActiveStreamUrl(player) ? (
+                {activeStreamUrl ? (
                   <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
                     <VideoPlayer
-                      src={getActiveStreamUrl(player)}
+                      src={activeStreamUrl}
                       title={player.name}
+                      isIframe={activeServer?.isIframe === true}
                       muted={true}
                       autoPlay={true}
                     />
@@ -1407,7 +1440,8 @@ export default function DashboardPage() {
                   </Link>
                 )}
               </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </>
@@ -1717,14 +1751,39 @@ export default function DashboardPage() {
                         />
                       </div>
                       <div className="sm:col-span-2">
-                        <label className="text-[9px] text-slate-400 font-bold block mb-1 uppercase tracking-wider">HLS URL</label>
+                        <div className="mb-1 flex items-center justify-between gap-2">
+                          <label className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
+                            {inputUrls[slot].isIframe ? "Iframe / HTML URL" : "Stream URL"}
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => handleInlineIframeToggle(slot)}
+                            className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition ${
+                              inputUrls[slot].isIframe
+                                ? "border-sky-400/40 bg-sky-500"
+                                : "border-white/10 bg-slate-800"
+                            }`}
+                            aria-pressed={inputUrls[slot].isIframe === true}
+                            aria-label={`Toggle iframe mode for server slot ${slot}`}
+                            title="Show this URL inside an iframe"
+                          >
+                            <span
+                              className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition ${
+                                inputUrls[slot].isIframe ? "translate-x-4" : "translate-x-0.5"
+                              }`}
+                            />
+                          </button>
+                        </div>
                         <input
                           type="text"
                           value={inputUrls[slot].url}
                           onChange={(e) => handleInlineUrlChange(slot, e.target.value)}
-                          placeholder="https://example.com/stream.m3u8"
+                          placeholder={inputUrls[slot].isIframe ? "https://example.com/embed/player.html" : "https://example.com/stream.m3u8"}
                           className="w-full px-3 py-1.5 bg-black/60 border border-white/10 rounded-lg text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-violet-500/50 font-mono"
                         />
+                        <p className="mt-1 text-[9px] text-slate-500">
+                          {inputUrls[slot].isIframe ? "Iframe mode embeds this page directly in the player frame." : "Stream mode plays HLS/m3u8 or direct media URLs."}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -1860,14 +1919,45 @@ export default function DashboardPage() {
                         />
                       </div>
                       <div className="sm:col-span-2">
-                        <label className="text-[9px] text-slate-400 font-bold block mb-1 uppercase tracking-wider">HLS URL</label>
+                        <div className="mb-1 flex items-center justify-between gap-2">
+                          <label className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
+                            {bulkInputUrls[activeBulkTab]?.[slot]?.isIframe ? "Iframe / HTML URL" : "Stream URL"}
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => handleBulkIframeToggle(activeBulkTab, slot)}
+                            className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition ${
+                              bulkInputUrls[activeBulkTab]?.[slot]?.isIframe
+                                ? "border-sky-400/40 bg-sky-500"
+                                : "border-white/10 bg-slate-800"
+                            }`}
+                            aria-pressed={bulkInputUrls[activeBulkTab]?.[slot]?.isIframe === true}
+                            aria-label={`Toggle iframe mode for server slot ${slot}`}
+                            title="Show this URL inside an iframe"
+                          >
+                            <span
+                              className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition ${
+                                bulkInputUrls[activeBulkTab]?.[slot]?.isIframe ? "translate-x-4" : "translate-x-0.5"
+                              }`}
+                            />
+                          </button>
+                        </div>
                         <input
                           type="text"
                           value={bulkInputUrls[activeBulkTab]?.[slot]?.url ?? ""}
                           onChange={(e) => handleBulkUrlChange(activeBulkTab, slot, e.target.value)}
-                          placeholder="https://example.com/stream.m3u8"
+                          placeholder={
+                            bulkInputUrls[activeBulkTab]?.[slot]?.isIframe
+                              ? "https://example.com/embed/player.html"
+                              : "https://example.com/stream.m3u8"
+                          }
                           className="w-full px-3 py-1.5 bg-black/60 border border-white/10 rounded-lg text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-violet-500/50 font-mono"
                         />
+                        <p className="mt-1 text-[9px] text-slate-500">
+                          {bulkInputUrls[activeBulkTab]?.[slot]?.isIframe
+                            ? "Iframe mode embeds this page directly in the player frame."
+                            : "Stream mode plays HLS/m3u8 or direct media URLs."}
+                        </p>
                       </div>
                     </div>
                   </div>

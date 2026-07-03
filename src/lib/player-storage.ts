@@ -7,6 +7,7 @@ import { getSupabaseStorageClient } from "@/lib/supabase-storage";
 export interface PlayerServer {
   name: string;
   url: string;
+  isIframe?: boolean;
 }
 
 export interface PlayerConfig {
@@ -38,7 +39,7 @@ function loadSeedPlayers(): PlayerConfig[] {
 }
 
 function createEmptyServer(): PlayerServer {
-  return { name: "", url: "" };
+  return { name: "", url: "", isIframe: false };
 }
 
 function normalizeServer(value: unknown): PlayerServer {
@@ -50,6 +51,7 @@ function normalizeServer(value: unknown): PlayerServer {
   return {
     name: typeof server.name === "string" ? server.name : "",
     url: typeof server.url === "string" ? server.url : "",
+    isIframe: server.isIframe === true,
   };
 }
 
