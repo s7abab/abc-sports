@@ -195,17 +195,14 @@ export default function Home() {
 
       <div className="relative mx-auto w-full max-w-4xl">
         <header className="mb-6 flex items-center justify-between border-b border-white/[0.06] pb-6">
-          <div className="flex -translate-x-6 items-center gap-3.5 sm:-translate-x-10">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-violet-600 to-fuchsia-600 flex items-center justify-center font-black text-white text-sm tracking-tighter shadow-[0_4px_20px_rgba(139,92,246,0.25)]">
+          <div className="flex items-center gap-2">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-tr from-violet-600 to-fuchsia-600 text-sm font-black tracking-tighter text-white shadow-[0_4px_20px_rgba(139,92,246,0.25)]">
               ABC
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight text-white bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
-                ABC SPORTS
+                SPORTS
               </h1>
-              <p className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold mt-0.5">
-                Match Schedule & Streams
-              </p>
             </div>
           </div>
           {whatsappUrl && (
