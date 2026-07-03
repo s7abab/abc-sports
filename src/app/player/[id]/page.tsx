@@ -266,33 +266,15 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(124,58,237,0.24),transparent_46%),linear-gradient(135deg,rgba(15,23,42,0.75),rgba(9,9,11,0.2)_42%,rgba(6,78,59,0.12))]" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/60 to-transparent" />
 
-      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
-        <header className="flex items-center justify-between gap-2 rounded-2xl border border-white/[0.07] bg-white/[0.035] p-2 shadow-xl shadow-black/20 backdrop-blur-md sm:p-2.5">
-          <div className="flex min-w-0 items-center">
-            <Link
-              href="/"
-              className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-black/40 px-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-200 shadow-lg shadow-black/20 transition hover:border-white/20 hover:bg-white/10 hover:text-white active:scale-95"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              <span>Back</span>
-            </Link>
-          </div>
-
-          <div className="flex shrink-0 items-center justify-end">
-            {whatsappUrl && (
-            <a
-              href={whatsappUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#25D366] text-[#09090b] shadow-[0_6px_18px_rgba(37,211,102,0.22)] transition hover:scale-[1.06] hover:bg-[#20ba5a] active:scale-95"
-              aria-label="Join WhatsApp group"
-            >
-              <svg className="h-3.5 w-3.5 fill-current" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12.031 2c-5.514 0-9.989 4.475-9.989 9.989 0 1.763.459 3.486 1.33 5.006L2 22l5.185-1.359a9.92 9.92 0 004.847 1.258c5.514 0 9.989-4.475 9.989-9.989S17.545 2 12.031 2zm0 18.294a8.276 8.276 0 01-4.222-1.157l-.303-.18-3.136.822.836-3.056-.197-.314a8.272 8.272 0 01-1.267-4.42c0-4.57 3.719-8.29 8.29-8.29 4.57 0 8.29 3.72 8.29 8.29s-3.72 8.29-8.29 8.29zM16.14 13.9c-.226-.113-1.337-.66-1.543-.736-.207-.076-.358-.113-.509.113-.15.226-.583.735-.715.885-.132.15-.263.17-.489.057a6.167 6.167 0 01-1.815-1.121 6.8 6.8 0 01-1.255-1.564c-.132-.226-.014-.348.099-.461.102-.102.226-.264.339-.396.113-.132.15-.226.226-.377.076-.15.038-.283-.019-.396-.056-.113-.509-1.225-.697-1.677-.183-.44-.369-.38-.509-.388a5.19 5.19 0 00-.433-.008c-.15 0-.396.056-.603.283-.207.226-.79.772-.79 1.883s.809 2.185.922 2.336c.113.15 1.59 2.429 3.854 3.407.538.232.959.371 1.287.475.54.172 1.03.148 1.417.09.433-.064 1.337-.546 1.525-1.074.189-.527.189-.979.132-1.074-.056-.095-.207-.15-.433-.264z" />
-              </svg>
-            </a>
-            )}
-          </div>
+      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col gap-2 px-4 pb-3 pt-0 sm:px-6 sm:pb-4 sm:pt-0 lg:px-8">
+        <header className="flex items-center rounded-2xl border border-white/[0.07] bg-white/[0.035] p-1.5 shadow-xl shadow-black/20 backdrop-blur-md sm:p-2">
+          <Link
+            href="/"
+            className="inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-xl border border-white/10 bg-black/40 px-2 text-[10px] font-bold uppercase tracking-wide text-slate-200 shadow-lg shadow-black/20 transition hover:border-white/20 hover:bg-white/10 hover:text-white active:scale-95"
+          >
+            <ArrowLeft className="h-3 w-3" />
+            <span>Back</span>
+          </Link>
         </header>
 
         {isLoading ? (
@@ -326,7 +308,7 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
             </div>
           </div>
         ) : player && currentStreamUrl ? (
-          <section className="flex flex-1 flex-col gap-4">
+          <section className="flex flex-1 flex-col gap-2">
             <div className="relative rounded-[2rem] border border-white/10 bg-gradient-to-br from-white/12 via-white/[0.035] to-emerald-500/10 p-2 shadow-2xl shadow-black/40 ring-1 ring-white/[0.03] sm:p-3">
               <div className="pointer-events-none absolute inset-0 rounded-[2rem] bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.18),transparent_32%),radial-gradient(circle_at_100%_100%,rgba(16,185,129,0.16),transparent_34%)]" />
               <div className="relative overflow-hidden rounded-[1.45rem] border border-black/60 bg-black shadow-inner shadow-black sm:rounded-[1.6rem]">
@@ -372,9 +354,9 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
               </a>
             )}
 
-            <div className="grid gap-3">
-              <div className="rounded-3xl border border-white/[0.07] bg-[#0f1115]/80 px-3.5 py-5 shadow-xl shadow-black/20 backdrop-blur-md sm:px-4 sm:py-6">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="grid gap-2">
+              <div className="rounded-3xl border border-white/[0.07] bg-[#0f1115]/80 px-3.5 py-4 shadow-xl shadow-black/20 backdrop-blur-md sm:px-4 sm:py-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <Radio className="h-4 w-4 text-emerald-300" />
@@ -391,7 +373,7 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
                 <button
                   type="button"
                   onClick={toggleAutoSwitch}
-                  className="mt-4 flex w-full items-center justify-between gap-3 rounded-2xl border border-white/[0.07] bg-black/25 px-3 py-2.5 text-left transition hover:border-violet-400/25 hover:bg-white/[0.05] active:scale-[0.99]"
+                  className="mt-2 flex w-full items-center justify-between gap-3 rounded-2xl border border-white/[0.07] bg-black/25 px-3 py-2.5 text-left transition hover:border-violet-400/25 hover:bg-white/[0.05] active:scale-[0.99]"
                   aria-pressed={isAutoSwitchEnabled}
                   aria-label="Toggle automatic server switching"
                 >
@@ -399,7 +381,7 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
                     <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-violet-500/10 text-violet-200">
                       <ShieldCheck className="h-3.5 w-3.5" />
                     </div>
-                    <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs font-black uppercase tracking-wider text-white">
+                    <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold uppercase tracking-wider text-white">
                       Auto-Switch Stream
                       <span className="rounded-full border border-amber-400/25 bg-amber-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-amber-200">
                         Beta
@@ -431,7 +413,7 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
                   </div>
                 </button>
 
-                <div className="mt-4 grid grid-cols-2 gap-3 sm:gap-4">
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:gap-3">
                   {availableServers.map((server) => (
                     <button
                       key={server.id}
