@@ -388,31 +388,6 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
                   </div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-3 sm:gap-4">
-                  {availableServers.map((server) => (
-                    <button
-                      key={server.id}
-                      type="button"
-                      onClick={() => switchServer(server.id)}
-                      className={`min-h-11 min-w-0 rounded-2xl border px-3 py-2.5 text-sm font-bold transition active:scale-95 ${
-                        activeServerId === server.id
-                          ? "border-emerald-400/50 bg-emerald-400/15 text-emerald-100 shadow-lg shadow-emerald-950/20"
-                          : "border-white/10 bg-white/[0.04] text-slate-300 hover:border-white/20 hover:bg-white/10 hover:text-white"
-                      }`}
-                      aria-pressed={activeServerId === server.id}
-                    >
-                      <span className="flex items-center gap-2">
-                        <span
-                          className={`h-2 w-2 rounded-full ${
-                            activeServerId === server.id ? "bg-emerald-300" : "bg-slate-600"
-                          }`}
-                        />
-                        <span className="truncate">{server.name}</span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-
                 <button
                   type="button"
                   onClick={toggleAutoSwitch}
@@ -424,10 +399,8 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
                     <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-violet-500/10 text-violet-200">
                       <ShieldCheck className="h-3.5 w-3.5" />
                     </div>
-                    <span
-                      className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs font-black uppercase tracking-wider text-white"
-                    >
-                      Auto-Switch Server
+                    <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs font-black uppercase tracking-wider text-white">
+                      Auto-Switch Stream
                       <span className="rounded-full border border-amber-400/25 bg-amber-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-amber-200">
                         Beta
                       </span>
@@ -457,6 +430,32 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
                     </span>
                   </div>
                 </button>
+
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:gap-4">
+                  {availableServers.map((server) => (
+                    <button
+                      key={server.id}
+                      type="button"
+                      onClick={() => switchServer(server.id)}
+                      className={`min-h-11 min-w-0 rounded-2xl border px-3 py-2.5 text-sm font-bold transition active:scale-95 ${
+                        activeServerId === server.id
+                          ? "border-emerald-400/50 bg-emerald-400/15 text-emerald-100 shadow-lg shadow-emerald-950/20"
+                          : "border-white/10 bg-white/[0.04] text-slate-300 hover:border-white/20 hover:bg-white/10 hover:text-white"
+                      }`}
+                      aria-pressed={activeServerId === server.id}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span
+                          className={`h-2 w-2 rounded-full ${
+                            activeServerId === server.id ? "bg-emerald-300" : "bg-slate-600"
+                          }`}
+                        />
+                        <span className="truncate">{server.name}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
               </div>
             </div>
           </section>
