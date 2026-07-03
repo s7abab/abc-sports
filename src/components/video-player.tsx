@@ -30,9 +30,8 @@ const PIPToggle = () => {
 
   return (
     <PIPButton
-      className={`vds-button h-full aspect-square flex items-center justify-center transition-colors duration-150 mr-1.5 cursor-pointer ${
-        isPictureInPicture ? "text-violet-400 hover:text-violet-300" : "text-slate-300 hover:text-white"
-      }`}
+      className={`vds-button h-full aspect-square flex items-center justify-center transition-colors duration-150 mr-1.5 cursor-pointer ${isPictureInPicture ? "text-violet-400 hover:text-violet-300" : "text-slate-300 hover:text-white"
+        }`}
       title="Picture-in-Picture"
       aria-label="Toggle Picture-in-Picture"
     >
@@ -52,6 +51,22 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
     });
     const [isServerMenuOpen, setIsServerMenuOpen] = useState(false);
     const playerRef = useRef<MediaPlayerInstance>(null);
+    const [whatsappUrl, setWhatsappUrl] = useState("");
+
+    useEffect(() => {
+      async function fetchSettings() {
+        try {
+          const response = await fetch("/api/settings");
+          if (response.ok) {
+            const data = await response.json();
+            setWhatsappUrl(data.whatsappUrl || "");
+          }
+        } catch (err) {
+          console.error("Error loading settings:", err);
+        }
+      }
+      fetchSettings();
+    }, []);
 
     useEffect(() => {
       const playerEl = playerRef.current;
@@ -166,6 +181,23 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
 
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 select-none animate-in fade-in duration-500">
             <div className="relative pointer-events-none transition-all duration-350 w-full h-full">
+              {whatsappUrl && (
+                <div className="absolute top-[1%] left-[clamp(4px,0.8vw,10px)] pointer-events-auto">
+                  <a
+                    href={whatsappUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-[clamp(4px,0.5vw,8px)] px-[clamp(8px,1vw,14px)] py-[clamp(4px,0.6vw,8px)] rounded-[clamp(6px,0.8vw,10px)] bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/20 hover:border-[#25D366]/40 shadow-[0_4px_12px_rgba(0,0,0,0.55)] backdrop-blur-md transition-all hover:scale-[1.03] cursor-pointer text-white"
+                  >
+                    <svg className="h-[clamp(12px,1.4vw,16px)] w-[clamp(12px,1.4vw,16px)] fill-[#25D366]" viewBox="0 0 24 24">
+                      <path d="M12.031 2c-5.514 0-9.989 4.475-9.989 9.989 0 1.763.459 3.486 1.33 5.006L2 22l5.185-1.359a9.92 9.92 0 004.847 1.258c5.514 0 9.989-4.475 9.989-9.989S17.545 2 12.031 2zm0 18.294a8.276 8.276 0 01-4.222-1.157l-.303-.18-3.136.822.836-3.056-.197-.314a8.272 8.272 0 01-1.267-4.42c0-4.57 3.719-8.29 8.29-8.29 4.57 0 8.29 3.72 8.29 8.29s-3.72 8.29-8.29 8.29zM16.14 13.9c-.226-.113-1.337-.66-1.543-.736-.207-.076-.358-.113-.509.113-.15.226-.583.735-.715.885-.132.15-.263.17-.489.057a6.167 6.167 0 01-1.815-1.121 6.8 6.8 0 01-1.255-1.564c-.132-.226-.014-.348.099-.461.102-.102.226-.264.339-.396.113-.132.15-.226.226-.377.076-.15.038-.283-.019-.396-.056-.113-.509-1.225-.697-1.677-.183-.44-.369-.38-.509-.388a5.19 5.19 0 00-.433-.008c-.15 0-.396.056-.603.283-.207.226-.79.772-.79 1.883s.809 2.185.922 2.336c.113.15 1.59 2.429 3.854 3.407.538.232.959.371.1287.475.54.172 1.03.148 1.417.09.433-.064 1.337-.546 1.525-1.074.189-.527.189-.979.132-1.074-.056-.095-.207-.15-.433-.264z" />
+                    </svg>
+                    <span className="text-[clamp(9px,1.1vw,12px)] font-black uppercase tracking-wider text-slate-100 select-none">
+                      Join WhatsApp
+                    </span>
+                  </a>
+                </div>
+              )}
               <div className="absolute top-[1%] right-[clamp(10px,1.5vw,20px)] pointer-events-none">
                 <div className="flex items-center gap-[clamp(4px,0.5vw,8px)] px-[clamp(10px,1.2vw,16px)] py-[clamp(5px,0.8vw,10px)] rounded-[clamp(6px,0.8vw,10px)] bg-slate-950/95 backdrop-blur-md border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.55)] transition-all duration-300 hover:border-violet-500/30">
                   <div className="w-[clamp(14px,1.5vw,18px)] h-[clamp(14px,1.5vw,18px)] rounded-full bg-gradient-to-tr from-violet-600 to-fuchsia-600 flex items-center justify-center text-[clamp(8px,1vw,10px)] font-black text-white shrink-0 shadow-sm tracking-tighter select-none">
@@ -223,7 +255,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
     };
 
     return (
-      <div 
+      <div
         onClick={() => {
           if (!canPlay) {
             setUserClickedShowOverlay(true);
@@ -249,7 +281,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
           autoPlay={autoPlay}
         >
           <MediaProvider />
-          
+
           <DefaultVideoLayout
             thumbnails={thumbnails}
             icons={defaultLayoutIcons}
@@ -279,8 +311,8 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
 
                       {isServerMenuOpen && (
                         <>
-                          <div 
-                            className="fixed inset-0 z-40 cursor-default" 
+                          <div
+                            className="fixed inset-0 z-40 cursor-default"
                             onClick={(e) => {
                               e.stopPropagation();
                               setIsServerMenuOpen(false);
@@ -298,11 +330,10 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                                   handleManualServerChange(srv.id);
                                   setIsServerMenuOpen(false);
                                 }}
-                                className={`w-full px-1.5 py-1.5 text-left text-[11px] font-medium rounded-lg transition-all duration-150 cursor-pointer flex items-center justify-between ${
-                                  activeServerId === srv.id
-                                    ? "bg-violet-600/20 text-violet-400 border border-violet-500/20"
-                                    : "text-slate-300 hover:text-white hover:bg-white/5 border border-transparent"
-                                }`}
+                                className={`w-full px-1.5 py-1.5 text-left text-[11px] font-medium rounded-lg transition-all duration-150 cursor-pointer flex items-center justify-between ${activeServerId === srv.id
+                                  ? "bg-violet-600/20 text-violet-400 border border-violet-500/20"
+                                  : "text-slate-300 hover:text-white hover:bg-white/5 border border-transparent"
+                                  }`}
                               >
                                 <span>{srv.name}</span>
                                 {activeServerId === srv.id && (
@@ -317,21 +348,20 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                   )}
 
                   <PIPToggle />
-                   <button
+                  <button
                     onClick={toggleFit}
-                    className={`vds-button h-full aspect-square flex items-center justify-center transition-colors duration-150 mr-1.5 cursor-pointer ${
-                      objectFit === "cover"
-                        ? "text-emerald-400 hover:text-emerald-300"
-                        : objectFit === "fill"
+                    className={`vds-button h-full aspect-square flex items-center justify-center transition-colors duration-150 mr-1.5 cursor-pointer ${objectFit === "cover"
+                      ? "text-emerald-400 hover:text-emerald-300"
+                      : objectFit === "fill"
                         ? "text-violet-400 hover:text-violet-300"
                         : "text-slate-300 hover:text-white"
-                    }`}
+                      }`}
                     title={
                       objectFit === "contain"
                         ? "Fit Screen (Letterbox)"
                         : objectFit === "cover"
-                        ? "Zoom to Fill (Crop)"
-                        : "Stretch to Fill (Distort)"
+                          ? "Zoom to Fill (Crop)"
+                          : "Stretch to Fill (Distort)"
                     }
                     aria-label="Toggle scaling mode"
                   >
@@ -345,11 +375,27 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
           {/* ABC Sports watermark shown in the top-right corner. */}
           {true && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 select-none animate-in fade-in duration-500">
-              <div className={`relative pointer-events-none transition-all duration-350 ${
-                objectFit === "contain"
-                  ? "w-full aspect-video max-h-full"
-                  : "w-full h-full"
-              }`}>
+              <div className={`relative pointer-events-none transition-all duration-350 ${objectFit === "contain"
+                ? "w-full aspect-video max-h-full"
+                : "w-full h-full"
+                }`}>
+                {whatsappUrl && (
+                  <div className="absolute top-[1%] left-[clamp(4px,0.8vw,10px)] pointer-events-auto">
+                    <a
+                      href={whatsappUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-[clamp(4px,0.5vw,8px)] px-[clamp(8px,1vw,14px)] py-[clamp(4px,0.6vw,8px)] rounded-[clamp(6px,0.8vw,10px)] bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/20 hover:border-[#25D366]/40 shadow-[0_4px_12px_rgba(0,0,0,0.55)] backdrop-blur-md transition-all hover:scale-[1.03] cursor-pointer text-white"
+                    >
+                      <svg className="h-[clamp(12px,1.4vw,16px)] w-[clamp(12px,1.4vw,16px)] fill-[#25D366]" viewBox="0 0 24 24">
+                        <path d="M12.031 2c-5.514 0-9.989 4.475-9.989 9.989 0 1.763.459 3.486 1.33 5.006L2 22l5.185-1.359a9.92 9.92 0 004.847 1.258c5.514 0 9.989-4.475 9.989-9.989S17.545 2 12.031 2zm0 18.294a8.276 8.276 0 01-4.222-1.157l-.303-.18-3.136.822.836-3.056-.197-.314a8.272 8.272 0 01-1.267-4.42c0-4.57 3.719-8.29 8.29-8.29 4.57 0 8.29 3.72 8.29 8.29s-3.72 8.29-8.29 8.29zM16.14 13.9c-.226-.113-1.337-.66-1.543-.736-.207-.076-.358-.113-.509.113-.15.226-.583.735-.715.885-.132.15-.263.17-.489.057a6.167 6.167 0 01-1.815-1.121 6.8 6.8 0 01-1.255-1.564c-.132-.226-.014-.348.099-.461.102-.102.226-.264.339-.396.113-.132.15-.226.226-.377.076-.15.038-.283-.019-.396-.056-.113-.509-1.225-.697-1.677-.183-.44-.369-.38-.509-.388a5.19 5.19 0 00-.433-.008c-.15 0-.396.056-.603.283-.207.226-.79.772-.79 1.883s.809 2.185.922 2.336c.113.15 1.59 2.429 3.854 3.407.538.232.959.371 1.287.475.54.172 1.03.148 1.417.09.433-.064 1.337-.546 1.525-1.074.189-.527.189-.979.132-1.074-.056-.095-.207-.15-.433-.264z" />
+                      </svg>
+                      <span className="text-[clamp(9px,1.1vw,12px)] font-black uppercase tracking-wider text-slate-100 select-none">
+                        Join WhatsApp
+                      </span>
+                    </a>
+                  </div>
+                )}
                 <div className="absolute top-[1%] right-[clamp(10px,1.5vw,20px)] pointer-events-none">
                   <div className="flex items-center gap-[clamp(4px,0.5vw,8px)] px-[clamp(10px,1.2vw,16px)] py-[clamp(5px,0.8vw,10px)] rounded-[clamp(6px,0.8vw,10px)] bg-slate-950/95 backdrop-blur-md border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.55)] transition-all duration-300 hover:border-violet-500/30">
                     <div className="w-[clamp(14px,1.5vw,18px)] h-[clamp(14px,1.5vw,18px)] rounded-full bg-gradient-to-tr from-violet-600 to-fuchsia-600 flex items-center justify-center text-[clamp(8px,1vw,10px)] font-black text-white shrink-0 shadow-sm tracking-tighter select-none">
@@ -412,7 +458,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
 
           {/* Custom Loading, Error and Servers Overlay */}
           {!canPlay && (loadingTimeout || error || allStreamsFailed || userClickedShowOverlay) && (
-            <div 
+            <div
               onClick={(e) => e.stopPropagation()}
               className="absolute inset-0 flex flex-col items-center justify-start sm:justify-center bg-black/90 backdrop-blur-sm z-40 animate-in fade-in duration-300 px-3 py-2.5 sm:p-6 text-center select-none pointer-events-auto overflow-y-auto"
             >
@@ -436,10 +482,10 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                     {allStreamsFailed
                       ? "All servers unavailable. Refresh or choose one."
                       : !isAutoSwitchEnabled
-                      ? statusMessage
-                      : countdown !== null && nextServerName
-                      ? `Switching to ${nextServerName} in ${countdown}s if needed.`
-                      : "Building buffer. Wait, refresh, or switch server."}
+                        ? statusMessage
+                        : countdown !== null && nextServerName
+                          ? `Switching to ${nextServerName} in ${countdown}s if needed.`
+                          : "Building buffer. Wait, refresh, or switch server."}
                   </span>
                   <span className="hidden sm:inline">{statusMessage}</span>
                 </p>
@@ -459,13 +505,12 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                           e.stopPropagation();
                           handleManualServerChange(srv.id);
                         }}
-                        className={`px-2.5 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs font-semibold rounded-lg sm:rounded-xl border transition-all duration-200 cursor-pointer max-w-[8rem] truncate ${
-                          activeServerId === srv.id
-                            ? "bg-violet-600 border-violet-500 text-white shadow-lg shadow-violet-600/20"
-                            : failedServerIds.has(srv.id)
+                        className={`px-2.5 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs font-semibold rounded-lg sm:rounded-xl border transition-all duration-200 cursor-pointer max-w-[8rem] truncate ${activeServerId === srv.id
+                          ? "bg-violet-600 border-violet-500 text-white shadow-lg shadow-violet-600/20"
+                          : failedServerIds.has(srv.id)
                             ? "bg-rose-950/30 border-rose-500/30 text-rose-200 hover:bg-rose-950/50"
                             : "bg-white/5 border-white/10 text-slate-300 hover:text-white hover:bg-white/10"
-                        }`}
+                          }`}
                       >
                         {srv.name}
                       </button>

@@ -47,8 +47,25 @@ export function ShakaClearKeyPlayer() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const watermarkRef = useRef<HTMLDivElement>(null);
+  const whatsappRef = useRef<HTMLDivElement>(null);
   const [scriptReady, setScriptReady] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [whatsappUrl, setWhatsappUrl] = useState("");
+
+  useEffect(() => {
+    async function fetchSettings() {
+      try {
+        const response = await fetch("/api/settings");
+        if (response.ok) {
+          const data = await response.json();
+          setWhatsappUrl(data.whatsappUrl || "");
+        }
+      } catch (err) {
+        console.error("Error loading settings:", err);
+      }
+    }
+    fetchSettings();
+  }, []);
 
   useEffect(() => {
     if (!scriptReady || !videoRef.current || !containerRef.current) {
@@ -147,8 +164,14 @@ export function ShakaClearKeyPlayer() {
         player.configure(playerConfig);
 
         window.setTimeout(() => {
-          if (!cancelled && watermark && container.contains(watermark)) {
-            container.appendChild(watermark);
+          if (!cancelled) {
+            if (watermark && container.contains(watermark)) {
+              container.appendChild(watermark);
+            }
+            const whatsappEl = whatsappRef.current;
+            if (whatsappEl && container.contains(whatsappEl)) {
+              container.appendChild(whatsappEl);
+            }
           }
         }, 100);
 
@@ -195,6 +218,28 @@ export function ShakaClearKeyPlayer() {
           playsInline
           controls={false}
         />
+
+        <div
+          ref={whatsappRef}
+          id="wa-btn"
+          className="pointer-events-none absolute left-[clamp(4px,0.8vw,10px)] top-[1%] z-10 select-none"
+        >
+          {whatsappUrl && (
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="pointer-events-auto flex items-center gap-[clamp(4px,0.5vw,8px)] rounded-[clamp(6px,0.8vw,10px)] border border-[#25D366]/20 bg-[#25D366]/10 px-[clamp(8px,1vw,14px)] py-[clamp(4px,0.6vw,8px)] shadow-[0_4px_12px_rgba(0,0,0,0.55)] backdrop-blur-md transition-all hover:scale-[1.03] hover:bg-[#25D366]/20 hover:border-[#25D366]/40 cursor-pointer text-white"
+            >
+              <svg className="h-[clamp(12px,1.4vw,16px)] w-[clamp(12px,1.4vw,16px)] fill-[#25D366]" viewBox="0 0 24 24">
+                <path d="M12.031 2c-5.514 0-9.989 4.475-9.989 9.989 0 1.763.459 3.486 1.33 5.006L2 22l5.185-1.359a9.92 9.92 0 004.847 1.258c5.514 0 9.989-4.475 9.989-9.989S17.545 2 12.031 2zm0 18.294a8.276 8.276 0 01-4.222-1.157l-.303-.18-3.136.822.836-3.056-.197-.314a8.272 8.272 0 01-1.267-4.42c0-4.57 3.719-8.29 8.29-8.29 4.57 0 8.29 3.72 8.29 8.29s-3.72 8.29-8.29 8.29zM16.14 13.9c-.226-.113-1.337-.66-1.543-.736-.207-.076-.358-.113-.509.113-.15.226-.583.735-.715.885-.132.15-.263.17-.489.057a6.167 6.167 0 01-1.815-1.121 6.8 6.8 0 01-1.255-1.564c-.132-.226-.014-.348.099-.461.102-.102.226-.264.339-.396.113-.132.15-.226.226-.377.076-.15.038-.283-.019-.396-.056-.113-.509-1.225-.697-1.677-.183-.44-.369-.38-.509-.388a5.19 5.19 0 00-.433-.008c-.15 0-.396.056-.603.283-.207.226-.79.772-.79 1.883s.809 2.185.922 2.336c.113.15 1.59 2.429 3.854 3.407.538.232.959.371 1.287.475.54.172 1.03.148 1.417.09.433-.064 1.337-.546 1.525-1.074.189-.527.189-.979.132-1.074-.056-.095-.207-.15-.433-.264z" />
+              </svg>
+              <span className="text-[clamp(9px,1.1vw,12px)] font-black uppercase tracking-wider text-slate-100 select-none">
+                Join WhatsApp
+              </span>
+            </a>
+          )}
+        </div>
 
         <div
           ref={watermarkRef}
