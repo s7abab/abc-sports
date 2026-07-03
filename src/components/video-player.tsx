@@ -244,8 +244,8 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                               setIsServerMenuOpen(false);
                             }}
                           />
-                          <div className="absolute bottom-full right-0 mb-2 bg-[#0f0f13]/95 backdrop-blur-md border border-white/10 rounded-xl p-1 shadow-2xl flex flex-col gap-0.5 min-w-[120px] z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
-                            <span className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-wider border-b border-white/5 mb-1 select-none">
+                          <div className="absolute bottom-full right-0 mb-2 bg-[#0f0f13]/95 backdrop-blur-md border border-white/10 rounded-xl px-0.5 py-1 shadow-2xl flex flex-col gap-0.5 min-w-[128px] z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
+                            <span className="px-1.5 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-wider border-b border-white/5 mb-1 select-none">
                               Servers
                             </span>
                             {servers.map((srv) => (
@@ -256,7 +256,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                                   handleManualServerChange(srv.id);
                                   setIsServerMenuOpen(false);
                                 }}
-                                className={`w-full px-2 py-1.5 text-left text-[11px] font-medium rounded-lg transition-all duration-150 cursor-pointer flex items-center justify-between ${
+                                className={`w-full px-1.5 py-1.5 text-left text-[11px] font-medium rounded-lg transition-all duration-150 cursor-pointer flex items-center justify-between ${
                                   activeServerId === srv.id
                                     ? "bg-violet-600/20 text-violet-400 border border-violet-500/20"
                                     : "text-slate-300 hover:text-white hover:bg-white/5 border border-transparent"

@@ -228,7 +228,7 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
             )}
 
             <div className="grid gap-3">
-              <div className="rounded-3xl border border-white/[0.07] bg-[#0f1115]/80 p-4 shadow-xl shadow-black/20 backdrop-blur-md sm:p-5">
+              <div className="rounded-3xl border border-white/[0.07] bg-[#0f1115]/80 px-3.5 py-5 shadow-xl shadow-black/20 backdrop-blur-md sm:px-4 sm:py-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
@@ -243,13 +243,13 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
                   </div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-2">
+                <div className="mt-4 grid grid-cols-1 gap-y-3 sm:gap-y-4">
                   {availableServers.map((server) => (
                     <button
                       key={server.id}
                       type="button"
                       onClick={() => switchServer(server.id)}
-                      className={`min-h-11 min-w-0 rounded-2xl border px-3 text-sm font-bold transition active:scale-95 ${
+                      className={`min-h-11 min-w-0 rounded-2xl border px-3 py-2.5 text-sm font-bold transition active:scale-95 ${
                         activeServerId === server.id
                           ? "border-emerald-400/50 bg-emerald-400/15 text-emerald-100 shadow-lg shadow-emerald-950/20"
                           : "border-white/10 bg-white/[0.04] text-slate-300 hover:border-white/20 hover:bg-white/10 hover:text-white"
