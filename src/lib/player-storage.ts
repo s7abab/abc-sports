@@ -178,18 +178,33 @@ export async function savePlayers(input: unknown): Promise<PlayerConfig[]> {
     .filter((player): player is PlayerConfig => Boolean(player));
 
   const supabase = getSupabaseStorageClient();
-  const { error: deleteError } = await supabase.from("players").delete().neq("id", "");
-  if (deleteError) {
-    throw deleteError;
+
+  const { data: existingPlayers, error: existingError } = await supabase
+    .from("players")
+    .select("id");
+
+  if (existingError) {
+    throw existingError;
+  }
+
+  const existingIds = new Set((existingPlayers ?? []).map((row) => row.id));
+  const nextIds = new Set(players.map((player) => player.id));
+  const removedIds = [...existingIds].filter((id) => !nextIds.has(id));
+
+  if (removedIds.length > 0) {
+    const { error: deleteError } = await supabase.from("players").delete().in("id", removedIds);
+    if (deleteError) {
+      throw deleteError;
+    }
   }
 
   if (players.length > 0) {
-    const { error: insertError } = await supabase
+    const { error: upsertError } = await supabase
       .from("players")
-      .insert(players.map(toPlayerRow));
+      .upsert(players.map(toPlayerRow), { onConflict: "id" });
 
-    if (insertError) {
-      throw insertError;
+    if (upsertError) {
+      throw upsertError;
     }
   }
 

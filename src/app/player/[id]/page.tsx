@@ -1,16 +1,87 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { VideoPlayer } from "@/components/video-player";
 import { ArrowLeft, Loader2, Radio, ShieldCheck, WifiOff } from "lucide-react";
 import type { MediaPlayerInstance } from "@vidstack/react";
+import { createClient as createSupabaseBrowserClient } from "@/utils/supabase/client";
 
 interface PlayerConfig {
   id: string;
   name: string;
   primaryServer: string;
   servers: Record<string, { name: string; url: string }>;
+}
+
+function normalizeServers(value: unknown): Record<string, { name: string; url: string }> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.entries(value as Record<string, unknown>).reduce<Record<string, { name: string; url: string }>>(
+    (servers, [slot, server]) => {
+      const entry = server && typeof server === "object" ? (server as Partial<{ name: string; url: string }>) : {};
+      servers[slot] = {
+        name: typeof entry.name === "string" ? entry.name : "",
+        url: typeof entry.url === "string" ? entry.url : "",
+      };
+      return servers;
+    },
+    {}
+  );
+}
+
+function normalizePlayer(value: unknown): PlayerConfig | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const player = value as Partial<PlayerConfig> & { servers?: unknown };
+  if (typeof player.id !== "string" || !player.id.trim()) {
+    return null;
+  }
+
+  const servers = normalizeServers(player.servers);
+  const firstServerId = Object.keys(servers)[0] ?? "1";
+
+  return {
+    id: player.id,
+    name: typeof player.name === "string" ? player.name : "",
+    primaryServer:
+      typeof player.primaryServer === "string" && servers[player.primaryServer]
+        ? player.primaryServer
+        : firstServerId,
+    servers,
+  };
+}
+
+function getAvailableServers(servers: PlayerConfig["servers"]) {
+  return Object.keys(servers)
+    .filter((slot) => servers[slot]?.url)
+    .map((slot) => ({
+      id: slot,
+      name: servers[slot]?.name || `Server ${slot}`,
+    }));
+}
+
+function resolveActiveServerId(player: PlayerConfig, preferred?: string | null) {
+  if (preferred && player.servers[preferred]?.url) {
+    return preferred;
+  }
+
+  const primary = player.primaryServer || "1";
+  if (player.servers[primary]?.url) {
+    return primary;
+  }
+
+  return Object.keys(player.servers).find((slot) => player.servers[slot]?.url) ?? null;
+}
+
+function arePlayersEqual(left: PlayerConfig | null, right: PlayerConfig | null) {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 export default function SinglePlayerPage({ params }: { params: Promise<{ id: string }> }) {
@@ -23,6 +94,7 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
   const [error, setError] = useState("");
   const [whatsappUrl, setWhatsappUrl] = useState("");
   const videoPlayerRef = React.useRef<MediaPlayerInstance>(null);
+  const activeServerIdRef = useRef<string | null>(null);
   const [isAutoSwitchEnabled, setIsAutoSwitchEnabled] = useState<boolean>(() => {
     if (typeof window === "undefined") {
       return true;
@@ -37,41 +109,110 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
   };
 
   useEffect(() => {
-    async function fetchPlayer() {
+    activeServerIdRef.current = activeServerId;
+  }, [activeServerId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let supabase: ReturnType<typeof createSupabaseBrowserClient> | null = null;
+    let channel: ReturnType<ReturnType<typeof createSupabaseBrowserClient>["channel"]> | null = null;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setPlayer(null);
+      setActiveServerId(null);
+      setError("");
+      setIsLoading(true);
+    });
+
+    try {
+      supabase = createSupabaseBrowserClient();
+      channel = supabase
+        .channel(`player-config:${playerId}`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "players", filter: `id=eq.${playerId}` },
+          (payload) => {
+            if (cancelled) return;
+
+            if (payload.eventType === "DELETE") {
+              setPlayer(null);
+              setActiveServerId(null);
+              setError(`Player with ID "${playerId}" not found.`);
+              setIsLoading(false);
+              return;
+            }
+
+            const nextPlayer = normalizePlayer(payload.new);
+            if (!nextPlayer) return;
+
+            setPlayer(nextPlayer);
+            setError("");
+            setIsLoading(false);
+            setActiveServerId((current) => resolveActiveServerId(nextPlayer, current ?? activeServerIdRef.current));
+          }
+        )
+        .subscribe((status, err) => {
+          if (err) {
+            console.error("Supabase realtime subscription error:", err);
+          }
+
+          if (status === "CHANNEL_ERROR") {
+            console.error(`Supabase realtime channel failed for player ${playerId}.`);
+          }
+        });
+    } catch (subscriptionError) {
+      console.error("Failed to initialize Supabase realtime subscription:", subscriptionError);
+    }
+
+    async function fetchPlayer({ silent = false }: { silent?: boolean } = {}) {
       try {
-        const response = await fetch("/api/players");
+        const response = await fetch("/api/players", { cache: "no-store" });
         if (response.ok) {
           const data: PlayerConfig[] = await response.json();
           const found = data.find((p) => p.id === playerId);
           if (found) {
-            setPlayer(found);
-
-            // Default to primary server slot, falling back to first available slot if primary is unconfigured
-            const primary = found.primaryServer || "1";
-            if (found.servers?.[primary]?.url) {
-              setActiveServerId(primary);
-            } else {
-              const availableSlots = Object.keys(found.servers ?? {}).filter((slot) => found.servers?.[slot]?.url);
-              if (availableSlots.length > 0) {
-                setActiveServerId(availableSlots[0]);
+            const normalized = normalizePlayer(found);
+            if (!normalized) {
+              if (!silent) {
+                setError(`Player with ID "${playerId}" not found.`);
               }
+              return;
             }
+
+            setPlayer((current) => {
+              if (arePlayersEqual(current, normalized)) {
+                return current;
+              }
+              return normalized;
+            });
+            if (!silent) {
+              setError("");
+            }
+            setActiveServerId((current) => resolveActiveServerId(normalized, current ?? activeServerIdRef.current));
           } else {
-            setError(`Player with ID "${playerId}" not found.`);
+            if (!silent) {
+              setError(`Player with ID "${playerId}" not found.`);
+            }
           }
         } else {
-          setError("Failed to fetch player settings from server.");
+          if (!silent) {
+            setError("Failed to fetch player settings from server.");
+          }
         }
       } catch {
-        setError("An error occurred while loading stream.");
+        if (!silent) {
+          setError("An error occurred while loading stream.");
+        }
       } finally {
-        setIsLoading(false);
+        if (!silent) {
+          setIsLoading(false);
+        }
       }
     }
 
     async function fetchSettings() {
       try {
-        const response = await fetch("/api/settings");
+        const response = await fetch("/api/settings", { cache: "no-store" });
         if (response.ok) {
           const data = await response.json();
           setWhatsappUrl(data.whatsappUrl || "");
@@ -83,17 +224,21 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
 
     fetchPlayer();
     fetchSettings();
+
+    const refreshInterval = window.setInterval(() => {
+      void fetchPlayer({ silent: true });
+    }, 5_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(refreshInterval);
+      if (channel && supabase) {
+        void supabase.removeChannel(channel);
+      }
+    };
   }, [playerId]);
 
-  // Filter available servers
-  const availableServers = player?.servers
-    ? Object.keys(player.servers)
-        .filter((slot) => player.servers[slot]?.url)
-        .map((slot) => ({
-          id: slot,
-          name: player.servers[slot]?.name || `Server ${slot}`,
-        }))
-    : [];
+  const availableServers = player ? getAvailableServers(player.servers) : [];
 
   const currentStreamUrl = player && activeServerId ? player.servers[activeServerId]?.url ?? "" : "";
 
@@ -243,7 +388,7 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
                   </div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-1 gap-y-3 sm:gap-y-4">
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:gap-4">
                   {availableServers.map((server) => (
                     <button
                       key={server.id}
