@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
-import { BroadcastHost } from "@/components/broadcast-host";
 
 const geistSans = localFont({
   src: "../../node_modules/next/dist/next-devtools/server/font/geist-latin.woff2",
@@ -29,7 +28,6 @@ export default function RootLayout({
   return (
     <html lang="en" className={`h-full antialiased ${geistSans.variable} ${geistMono.variable}`}>
       <body className="min-h-full flex flex-col">
-        <BroadcastHost />
         {children}
         <Analytics />
       </body>
