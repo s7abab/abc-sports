@@ -213,13 +213,8 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
 
     fetchPlayer();
 
-    const refreshInterval = window.setInterval(() => {
-      void fetchPlayer({ silent: true });
-    }, 5_000);
-
     return () => {
       cancelled = true;
-      window.clearInterval(refreshInterval);
       if (channel && supabase) {
         void supabase.removeChannel(channel);
       }

@@ -133,18 +133,6 @@ export function useLiveStreamController({
       }
 
       lastReportedEventRef.current.set(key, now);
-
-      fetch("/api/stream-health", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          playerId,
-          ...payload,
-        }),
-        keepalive: true,
-      }).catch(() => {
-        // Health reporting must never affect playback.
-      });
     },
     [isAutoSwitchEnabled, playerId]
   );

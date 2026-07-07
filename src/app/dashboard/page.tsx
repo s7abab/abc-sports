@@ -29,15 +29,6 @@ interface PlayerConfig {
   servers: PlayerServers;
 }
 
-interface StreamHealthAlert {
-  severity: "info" | "warning" | "critical";
-  title: string;
-  message: string;
-  playerId: string;
-  serverId?: string;
-  createdAt: string;
-}
-
 const DEFAULT_SERVER_SLOT_COUNT = 4;
 
 function createEmptyServer(): PlayerServer {
@@ -153,10 +144,6 @@ export default function DashboardPage() {
   const [bulkPrimaryServers, setBulkPrimaryServers] = useState<{ [key: string]: string }>({});
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [streamHealthSummary, setStreamHealthSummary] = useState("No stream health events have been reported yet.");
-  const [streamHealthAlerts, setStreamHealthAlerts] = useState<StreamHealthAlert[]>([]);
-  const [isHealthLoading, setIsHealthLoading] = useState(false);
-
   const getRelativeDateKey = (day: "today" | "tomorrow") => {
     const now = new Date();
     if (day === "today") {
@@ -248,39 +235,6 @@ export default function DashboardPage() {
     fetchMatches();
     fetchSettings();
     fetchBroadcast();
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function fetchStreamHealth() {
-      try {
-        setIsHealthLoading(true);
-        const response = await fetch("/api/stream-health", { cache: "no-store" });
-        if (!response.ok) return;
-        const data = (await response.json()) as {
-          summary?: string;
-          alerts?: StreamHealthAlert[];
-        };
-
-        if (!cancelled) {
-          setStreamHealthSummary(data.summary || "No stream health events have been reported yet.");
-          setStreamHealthAlerts(Array.isArray(data.alerts) ? data.alerts : []);
-        }
-      } finally {
-        if (!cancelled) {
-          setIsHealthLoading(false);
-        }
-      }
-    }
-
-    fetchStreamHealth();
-    const interval = window.setInterval(fetchStreamHealth, 30_000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
   }, []);
 
   const handleSaveSettings = async (e: React.FormEvent) => {
