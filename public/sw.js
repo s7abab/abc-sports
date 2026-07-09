@@ -1,4 +1,4 @@
-const CACHE_VERSION = "abc-sports-pwa-v1";
+const CACHE_VERSION = "abc-sports-pwa-v2";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const OFFLINE_URL = "/offline";
 const PRECACHE_URLS = [
@@ -87,10 +87,19 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate") {
     event.respondWith(
-      fetch(request).catch(async () => {
-        const cache = await caches.open(STATIC_CACHE);
-        return cache.match(OFFLINE_URL);
-      })
+      fetch(request)
+        .then(async (response) => {
+          if (response.ok) {
+            return response;
+          }
+
+          const cache = await caches.open(STATIC_CACHE);
+          return cache.match(OFFLINE_URL) || response;
+        })
+        .catch(async () => {
+          const cache = await caches.open(STATIC_CACHE);
+          return cache.match(OFFLINE_URL);
+        })
     );
     return;
   }

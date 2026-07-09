@@ -17,33 +17,30 @@ export function ServiceWorkerRegistration() {
 
     if (!isSupportedOrigin) return;
 
-    window.addEventListener(
-      "load",
-      () => {
-        navigator.serviceWorker
-          .register("/sw.js")
-          .then((registration) => {
-            if (registration.waiting) {
-              setWaitingWorker(registration.waiting);
+    navigator.serviceWorker
+      .register("/sw.js", {
+        scope: "/",
+        updateViaCache: "none",
+      })
+      .then((registration) => {
+        if (registration.waiting) {
+          setWaitingWorker(registration.waiting);
+        }
+
+        registration.addEventListener("updatefound", () => {
+          const nextWorker = registration.installing;
+          if (!nextWorker) return;
+
+          nextWorker.addEventListener("statechange", () => {
+            if (nextWorker.state === "installed" && navigator.serviceWorker.controller) {
+              setWaitingWorker(nextWorker);
             }
-
-            registration.addEventListener("updatefound", () => {
-              const nextWorker = registration.installing;
-              if (!nextWorker) return;
-
-              nextWorker.addEventListener("statechange", () => {
-                if (nextWorker.state === "installed" && navigator.serviceWorker.controller) {
-                  setWaitingWorker(nextWorker);
-                }
-              });
-            });
-          })
-          .catch((error: unknown) => {
-            console.error("Service worker registration failed:", error);
           });
-      },
-      { once: true }
-    );
+        });
+      })
+      .catch((error: unknown) => {
+        console.error("Service worker registration failed:", error);
+      });
   }, []);
 
   if (!waitingWorker) return null;
