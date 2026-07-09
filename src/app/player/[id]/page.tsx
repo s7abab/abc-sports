@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { VideoPlayer } from "@/components/video-player";
+import { AdaptiveStreamPlayer } from "@/components/adaptive-stream-player";
 import { ArrowLeft, Loader2, Radio, ShieldCheck, WifiOff } from "lucide-react";
 import type { MediaPlayerInstance } from "@vidstack/react";
 import { createClient as createSupabaseBrowserClient } from "@/utils/supabase/client";
@@ -78,6 +78,23 @@ function resolveActiveServerId(player: PlayerConfig, preferred?: string | null) 
   }
 
   return Object.keys(player.servers).find((slot) => player.servers[slot]?.url) ?? null;
+}
+
+function resolvePlaybackUrl(url: string, isIframe: boolean) {
+  if (isIframe) {
+    return url;
+  }
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return url;
+    }
+
+    return `/api/stream?url=${encodeURIComponent(parsed.toString())}`;
+  } catch {
+    return url;
+  }
 }
 
 function arePlayersEqual(left: PlayerConfig | null, right: PlayerConfig | null) {
@@ -240,6 +257,7 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
 
   const currentServer = player && activeServerId ? player.servers[activeServerId] ?? null : null;
   const currentStreamUrl = currentServer?.url ?? "";
+  const playbackUrl = resolvePlaybackUrl(currentStreamUrl, currentServer?.isIframe === true);
 
   const switchServer = (serverId: string) => {
     const wasFullscreen = Boolean(videoPlayerRef.current?.state.fullscreen || document.fullscreenElement);
@@ -311,9 +329,9 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
             <div className="relative rounded-[2rem] border border-white/10 bg-gradient-to-br from-white/12 via-white/[0.035] to-emerald-500/10 p-2 shadow-2xl shadow-black/40 ring-1 ring-white/[0.03] sm:p-3">
               <div className="pointer-events-none absolute inset-0 rounded-[2rem] bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.18),transparent_32%),radial-gradient(circle_at_100%_100%,rgba(16,185,129,0.16),transparent_34%)]" />
               <div className="relative overflow-hidden rounded-[1.45rem] border border-black/60 bg-black shadow-inner shadow-black sm:rounded-[1.6rem]">
-                <VideoPlayer
+                <AdaptiveStreamPlayer
                   ref={videoPlayerRef}
-                  src={currentStreamUrl}
+                  src={playbackUrl}
                   title={player.name}
                   isIframe={currentServer?.isIframe === true}
                   blockIframePopups={currentServer?.blockPopups !== false}

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { VideoPlayer } from "@/components/video-player";
+import { AdaptiveStreamPlayer } from "@/components/adaptive-stream-player";
 import type { MatchConfig } from "@/lib/match-storage";
 import type { BroadcastMessage } from "@/lib/broadcast-storage";
 import {
@@ -1435,7 +1435,7 @@ export default function DashboardPage() {
                 {/* Video Player or Offline Placeholder */}
                 {activeStreamUrl ? (
                   <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
-                    <VideoPlayer
+                    <AdaptiveStreamPlayer
                       src={activeStreamUrl}
                       title={player.name}
                       isIframe={activeServer?.isIframe === true}

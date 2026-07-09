@@ -25,6 +25,25 @@ interface VideoPlayerProps {
   isAutoSwitchEnabled?: boolean;
 }
 
+function resolvePlayableSrc(src: string, isIframe: boolean) {
+  if (isIframe) return src;
+  if (src.startsWith("/api/stream?url=")) {
+    return typeof window === "undefined" ? src : `${window.location.origin}${src}`;
+  }
+
+  try {
+    const parsed = new URL(src);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return src;
+    }
+
+    const proxyPath = `/api/stream?url=${encodeURIComponent(parsed.toString())}`;
+    return typeof window === "undefined" ? proxyPath : `${window.location.origin}${proxyPath}`;
+  } catch {
+    return src;
+  }
+}
+
 const PIPToggle = () => {
   const isPictureInPicture = useMediaState("pictureInPicture");
 
@@ -45,6 +64,7 @@ const PIPToggle = () => {
 
 export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
   ({ src, title, isIframe = false, blockIframePopups = true, thumbnails, onPlay, onPause, children, muted = false, autoPlay = false, playerId, servers = [], activeServerId, onServerChange, isAutoSwitchEnabled = true }, ref) => {
+    const playableSrc = resolvePlayableSrc(src, isIframe);
     const [objectFit, setObjectFit] = useState<"contain" | "cover" | "fill">(() => {
       if (typeof window === "undefined") return "contain";
       return window.matchMedia("(max-width: 640px), (pointer: coarse)").matches ? "fill" : "contain";
@@ -134,7 +154,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
         window.clearTimeout(resetTimer);
         window.clearTimeout(timer);
       };
-    }, [canPlay, src]);
+    }, [canPlay, playableSrc]);
 
     const toggleFit = () => {
       setObjectFit((prev) => {
@@ -153,7 +173,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
         <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black/95 border border-white/10 shadow-2xl backdrop-blur-md transition-all duration-300 hover:border-violet-500/30 group">
           <iframe
             key={src}
-            src={src}
+            src={playableSrc}
             title={title}
             className="h-full w-full border-0 bg-black"
             allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
@@ -218,7 +238,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
           key={`${activeServerId ?? finalSrc}:${finalSrc}:${sourceVersion}`}
           className="w-full h-full select-none outline-none relative"
           title={title}
-          src={finalSrc}
+          src={playableSrc}
           crossOrigin="anonymous"
           playsInline
           streamType="live"
