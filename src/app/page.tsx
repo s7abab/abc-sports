@@ -217,6 +217,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [staleSavedAt, setStaleSavedAt] = useState("");
+  const [whatsappUrl, setWhatsappUrl] = useState("");
 
   useEffect(() => {
     async function fetchMatches() {
@@ -250,6 +251,22 @@ export default function Home() {
     }
 
     fetchMatches();
+  }, []);
+
+  useEffect(() => {
+    async function fetchSettings() {
+      try {
+        const response = await fetch("/api/settings");
+        if (response.ok) {
+          const data = await response.json();
+          setWhatsappUrl(data.whatsappUrl || "");
+        }
+      } catch (err) {
+        console.error("Error loading settings:", err);
+      }
+    }
+
+    fetchSettings();
   }, []);
 
   const now = new Date();
@@ -286,6 +303,37 @@ export default function Home() {
             <div className="rounded-2xl border border-amber-300/20 bg-amber-400/10 px-4 py-3 text-xs leading-5 text-amber-100">
               Showing cached schedule from {new Date(staleSavedAt).toLocaleString()}. Reconnect for
               live match and stream updates.
+            </div>
+          )}
+
+          {whatsappUrl && (
+            <div className="rounded-2xl border border-[#25D366]/20 bg-[#25D366]/10 px-4 py-3 text-sm text-slate-100 shadow-[0_8px_30px_rgba(0,0,0,0.14)]">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#25D366] text-[#09090b]">
+                    <svg className="h-4 w-4 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12.031 2c-5.514 0-9.989 4.475-9.989 9.989 0 1.763.459 3.486 1.33 5.006L2 22l5.185-1.359a9.92 9.92 0 0 0 4.847 1.258c5.514 0 9.989-4.475 9.989-9.989S17.545 2 12.031 2zm0 18.294a8.276 8.276 0 0 1-4.222-1.157l-.303-.18-3.136.822.836-3.056-.197-.314a8.272 8.272 0 0 1-1.267-4.42c0-4.57 3.719-8.29 8.29-8.29 4.57 0 8.29 3.72 8.29 8.29s-3.72 8.29-8.29 8.29zM16.14 13.9c-.226-.113-1.337-.66-1.543-.736-.207-.076-.358-.113-.509.113-.15.226-.583.735-.715.885-.132.15-.263.17-.489.057a6.167 6.167 0 0 1-1.815-1.121 6.8 6.8 0 0 1-1.255-1.564c-.132-.226-.014-.348.099-.461.102-.102.226-.264.339-.396.113-.132.15-.226.226-.377.076-.15.038-.283-.019-.396-.056-.113-.509-1.225-.697-1.677-.183-.44-.369-.38-.509-.388a5.19 5.19 0 0 0-.433-.008c-.15 0-.396.056-.603.283-.207.226-.79.772-.79 1.883s.809 2.185.922 2.336c.113.15 1.59 2.429 3.854 3.407.538.232.959.371 1.287.475.54.172 1.03.148 1.417.09.433-.064 1.337-.546 1.525-1.074.189-.527.189-.979.132-1.074-.056-.095-.207-.15-.433-.264z" />
+                    </svg>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-50/80">
+                      Community updates
+                    </p>
+                    <p className="truncate text-xs text-emerald-50/85">
+                      Join the WhatsApp group for stream alerts and schedule updates.
+                    </p>
+                  </div>
+                </div>
+
+                <a
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 text-xs font-black uppercase tracking-wider text-[#09090b] transition hover:bg-[#20ba5a] active:scale-[0.99]"
+                >
+                  <span>Join WhatsApp Group</span>
+                </a>
+              </div>
             </div>
           )}
 
