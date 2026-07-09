@@ -10,6 +10,9 @@ const PRECACHE_URLS = [
   "/apple-touch-icon.png",
 ];
 
+const MATCHES_CACHE = `${CACHE_VERSION}-matches`;
+const CURRENT_CACHES = new Set([STATIC_CACHE, MATCHES_CACHE]);
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
@@ -26,12 +29,18 @@ self.addEventListener("activate", (event) => {
       .then((cacheNames) =>
         Promise.all(
           cacheNames
-            .filter((cacheName) => cacheName.startsWith("abc-sports-pwa-") && cacheName !== STATIC_CACHE)
+            .filter((cacheName) => cacheName.startsWith("abc-sports-pwa-") && !CURRENT_CACHES.has(cacheName))
             .map((cacheName) => caches.delete(cacheName))
         )
       )
       .then(() => self.clients.claim())
   );
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });
 
 function shouldBypassCache(request, url) {
@@ -54,6 +63,25 @@ function isStaticAsset(request, url) {
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
+
+  if (url.origin === self.location.origin && url.pathname === "/api/matches") {
+    event.respondWith(
+      fetch(request)
+        .then((networkResponse) => {
+          if (networkResponse.ok) {
+            const responseToCache = networkResponse.clone();
+            caches.open(MATCHES_CACHE).then((cache) => cache.put(request, responseToCache));
+          }
+
+          return networkResponse;
+        })
+        .catch(async () => {
+          const cachedResponse = await caches.match(request);
+          return cachedResponse || Response.json({ error: "No cached matches available" }, { status: 503 });
+        })
+    );
+    return;
+  }
 
   if (shouldBypassCache(request, url)) return;
 

@@ -13,6 +13,34 @@ import {
   type RuntimeMatchStatus,
 } from "@/lib/match-utils";
 
+const MATCH_CACHE_KEY = "abc-sports-latest-matches";
+
+type CachedMatches = {
+  savedAt: string;
+  matches: MatchConfig[];
+};
+
+function readCachedMatches(): CachedMatches | null {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(MATCH_CACHE_KEY) || "null");
+    if (!parsed || !Array.isArray(parsed.matches)) return null;
+    return parsed as CachedMatches;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedMatches(matches: MatchConfig[]) {
+  try {
+    window.localStorage.setItem(
+      MATCH_CACHE_KEY,
+      JSON.stringify({ savedAt: new Date().toISOString(), matches })
+    );
+  } catch {
+    return;
+  }
+}
+
 function MatchCardCountdownOnly({
   matchDateString,
 }: {
@@ -188,6 +216,7 @@ export default function Home() {
   const [matches, setMatches] = useState<MatchConfig[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [staleSavedAt, setStaleSavedAt] = useState("");
 
   useEffect(() => {
     async function fetchMatches() {
@@ -196,11 +225,25 @@ export default function Home() {
         if (response.ok) {
           const data = await response.json();
           setMatches(data);
+          setStaleSavedAt("");
+          writeCachedMatches(data);
         } else {
-          setError("Failed to load match schedule.");
+          const cached = readCachedMatches();
+          if (cached) {
+            setMatches(cached.matches);
+            setStaleSavedAt(cached.savedAt);
+          } else {
+            setError("Failed to load match schedule.");
+          }
         }
       } catch (err) {
-        setError("An error occurred while loading schedule.");
+        const cached = readCachedMatches();
+        if (cached) {
+          setMatches(cached.matches);
+          setStaleSavedAt(cached.savedAt);
+        } else {
+          setError("An error occurred while loading schedule.");
+        }
       } finally {
         setIsLoading(false);
       }
@@ -238,6 +281,13 @@ export default function Home() {
               Live schedule
             </span>
           </header>
+
+          {staleSavedAt && (
+            <div className="rounded-2xl border border-amber-300/20 bg-amber-400/10 px-4 py-3 text-xs leading-5 text-amber-100">
+              Showing cached schedule from {new Date(staleSavedAt).toLocaleString()}. Reconnect for
+              live match and stream updates.
+            </div>
+          )}
 
           {isLoading ? (
             <div className="app-panel mt-6 flex flex-col items-center justify-center gap-3 rounded-3xl p-12 text-center">

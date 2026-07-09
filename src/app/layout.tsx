@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { Analytics } from "@vercel/analytics/next";
 import { PwaInstallPrompt } from "@/components/pwa-install-prompt";
+import { PwaOfflineSync } from "@/components/pwa-offline-sync";
 import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
 import "./globals.css";
 
@@ -49,6 +50,7 @@ export default function RootLayout({
         {children}
         <ServiceWorkerRegistration />
         <PwaInstallPrompt />
+        <PwaOfflineSync />
         <Analytics />
       </body>
     </html>

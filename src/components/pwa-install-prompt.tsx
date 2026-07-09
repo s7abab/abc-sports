@@ -97,6 +97,8 @@ export function PwaInstallPrompt() {
 
   const dismiss = () => {
     snoozePrompt();
+    setInstallEvent(null);
+    setShowIosHint(false);
     setIsVisible(false);
   };
 
@@ -113,6 +115,19 @@ export function PwaInstallPrompt() {
       setIsInstalling(false);
     }
   };
+
+  if (!isVisible && installEvent) {
+    return (
+      <button
+        type="button"
+        onClick={() => setIsVisible(true)}
+        className="fixed bottom-20 right-4 z-50 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white px-4 py-3 text-sm font-black text-slate-950 shadow-2xl shadow-black/40 transition hover:scale-[1.02] hover:bg-red-100 sm:bottom-24 sm:right-6"
+      >
+        <Download className="h-4 w-4" aria-hidden="true" />
+        Install app
+      </button>
+    );
+  }
 
   if (!isVisible || (!installEvent && !showIosHint)) {
     return null;

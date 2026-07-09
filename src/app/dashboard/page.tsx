@@ -11,6 +11,7 @@ import {
   getLocalDateKey,
   type MatchStatus,
 } from "@/lib/match-utils";
+import { queuedFetch } from "@/lib/pwa-offline-queue";
 import { Tv, Sparkles, Loader2, Copy, Check, Settings, Save, ExternalLink, X, Plus, CalendarPlus, Pencil, Trash2, RotateCcw, Megaphone, Send, Image as ImageIcon } from "lucide-react";
 
 interface PlayerServer {
@@ -28,6 +29,11 @@ interface PlayerConfig {
   primaryServer: string;
   servers: PlayerServers;
 }
+
+type QueuedApiResponse = {
+  queued?: boolean;
+  message?: string;
+};
 
 const DEFAULT_SERVER_SLOT_COUNT = 4;
 
@@ -235,6 +241,15 @@ export default function DashboardPage() {
     fetchMatches();
     fetchSettings();
     fetchBroadcast();
+
+    const shared = new URLSearchParams(window.location.search).get("shared");
+    if (shared) {
+      queueMicrotask(() => {
+        setActiveTab("settings");
+        setBroadcastDescription((current) => current || shared);
+        setBroadcastTitle((current) => current || "Shared update");
+      });
+    }
   }, []);
 
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -259,13 +274,17 @@ export default function DashboardPage() {
     }
 
     try {
-      const response = await fetch("/api/settings", {
+      const response = await queuedFetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ whatsappUrl }),
       });
 
       if (response.ok) {
+        const data = (await response.json().catch(() => ({}))) as QueuedApiResponse;
+        if (data.queued) {
+          setSettingsError(data.message || "Saved offline. Settings will sync when the connection returns.");
+        }
         setSettingsSuccess(true);
         setTimeout(() => setSettingsSuccess(false), 3000);
       } else {
@@ -328,7 +347,7 @@ export default function DashboardPage() {
     }
 
     try {
-      const response = await fetch("/api/broadcast", {
+      const response = await queuedFetch("/api/broadcast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -343,7 +362,7 @@ export default function DashboardPage() {
       });
 
       if (response.ok) {
-        const data = (await response.json()) as { broadcast?: BroadcastMessage };
+        const data = (await response.json()) as { broadcast?: BroadcastMessage } & QueuedApiResponse;
         if (data.broadcast) {
           setBroadcastTitle(data.broadcast.title || "");
           setBroadcastDescription(data.broadcast.description || "");
@@ -356,6 +375,9 @@ export default function DashboardPage() {
             data.broadcast.imageUrls?.[2] || "",
           ]);
           setBroadcastIsActive(Boolean(data.broadcast.isActive));
+        }
+        if (data.queued) {
+          setBroadcastError(data.message || "Saved offline. Broadcast will sync when the connection returns.");
         }
         setBroadcastSuccess(true);
         setTimeout(() => setBroadcastSuccess(false), 3000);
@@ -376,13 +398,17 @@ export default function DashboardPage() {
     setIsSavingBroadcast(true);
 
     try {
-      const response = await fetch("/api/broadcast", { method: "DELETE" });
+      const response = await queuedFetch("/api/broadcast", { method: "DELETE" });
       if (!response.ok) {
         const data = await response.json();
         setBroadcastError(data.error || "Failed to disable broadcast message.");
         return;
       }
 
+      const data = (await response.json().catch(() => ({}))) as QueuedApiResponse;
+      if (data.queued) {
+        setBroadcastError(data.message || "Saved offline. Broadcast disable will sync when the connection returns.");
+      }
       setBroadcastIsActive(false);
       setBroadcastSuccess(true);
       setTimeout(() => setBroadcastSuccess(false), 3000);
@@ -508,7 +534,7 @@ export default function DashboardPage() {
           : p
       );
 
-      const response = await fetch("/api/players", {
+      const response = await queuedFetch("/api/players", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedPlayers),
@@ -677,7 +703,7 @@ export default function DashboardPage() {
         };
       });
 
-      const response = await fetch("/api/players", {
+      const response = await queuedFetch("/api/players", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedPlayers),
@@ -707,7 +733,7 @@ export default function DashboardPage() {
         p.id === playerId ? { ...p, primaryServer: slot } : p
       );
 
-      const response = await fetch("/api/players", {
+      const response = await queuedFetch("/api/players", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedPlayers),
@@ -787,7 +813,7 @@ export default function DashboardPage() {
     if (!confirmed) return;
 
     try {
-      const response = await fetch(`/api/matches/${match.id}`, {
+      const response = await queuedFetch(`/api/matches/${match.id}`, {
         method: "DELETE",
       });
 
@@ -797,6 +823,10 @@ export default function DashboardPage() {
         return;
       }
 
+      const data = (await response.json().catch(() => ({}))) as QueuedApiResponse;
+      if (data.queued) {
+        setMatchError(data.message || "Saved offline. Match deletion will sync when the connection returns.");
+      }
       setMatches((prev) => prev.filter((item) => item.id !== match.id));
       if (editingMatch?.id === match.id) {
         handleStartNewMatch();
@@ -832,12 +862,12 @@ export default function DashboardPage() {
     }
 
     try {
-      const response = await fetch(
+      const response = await queuedFetch(
         editingMatch ? `/api/matches/${editingMatch.id}` : "/api/matches",
         {
           method: editingMatch ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
         }
       );
 
@@ -847,11 +877,21 @@ export default function DashboardPage() {
         return;
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as { match?: MatchConfig } & QueuedApiResponse;
+      const optimisticMatch: MatchConfig = data.match ?? {
+        id: editingMatch?.id ?? `queued-${Date.now()}`,
+        ...payload,
+        status: payload.status as MatchStatus,
+      };
+
+      if (data.queued) {
+        setMatchError(data.message || "Saved offline. Match change will sync when the connection returns.");
+      }
+
       setMatches((prev) =>
         editingMatch
-          ? prev.map((match) => (match.id === editingMatch.id ? data.match : match))
-          : [...prev, data.match]
+          ? prev.map((match) => (match.id === editingMatch.id ? optimisticMatch : match))
+          : [...prev, optimisticMatch]
       );
       setEditingMatch(null);
       setMatchForm({
