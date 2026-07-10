@@ -5,7 +5,6 @@ import Link from "next/link";
 import { AdaptiveStreamPlayer } from "@/components/adaptive-stream-player";
 import { ArrowLeft, Loader2, Radio, ShieldCheck, WifiOff } from "lucide-react";
 import type { MediaPlayerInstance } from "@vidstack/react";
-import { createClient as createSupabaseBrowserClient } from "@/utils/supabase/client";
 
 interface PlayerConfig {
   id: string;
@@ -133,8 +132,7 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
 
   useEffect(() => {
     let cancelled = false;
-    let supabase: ReturnType<typeof createSupabaseBrowserClient> | null = null;
-    let channel: ReturnType<ReturnType<typeof createSupabaseBrowserClient>["channel"]> | null = null;
+
     queueMicrotask(() => {
       if (cancelled) return;
       setPlayer(null);
@@ -142,46 +140,6 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
       setError("");
       setIsLoading(true);
     });
-
-    try {
-      supabase = createSupabaseBrowserClient();
-      channel = supabase
-        .channel(`player-config:${playerId}`)
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "players", filter: `id=eq.${playerId}` },
-          (payload) => {
-            if (cancelled) return;
-
-            if (payload.eventType === "DELETE") {
-              setPlayer(null);
-              setActiveServerId(null);
-              setError(`Player with ID "${playerId}" not found.`);
-              setIsLoading(false);
-              return;
-            }
-
-            const nextPlayer = normalizePlayer(payload.new);
-            if (!nextPlayer) return;
-
-            setPlayer(nextPlayer);
-            setError("");
-            setIsLoading(false);
-            setActiveServerId((current) => resolveActiveServerId(nextPlayer, current ?? activeServerIdRef.current));
-          }
-        )
-        .subscribe((status, err) => {
-          if (err) {
-            console.error("Supabase realtime subscription error:", err);
-          }
-
-          if (status === "CHANNEL_ERROR") {
-            console.error(`Supabase realtime channel failed for player ${playerId}.`);
-          }
-        });
-    } catch (subscriptionError) {
-      console.error("Failed to initialize Supabase realtime subscription:", subscriptionError);
-    }
 
     async function fetchPlayer({ silent = false }: { silent?: boolean } = {}) {
       try {
@@ -247,9 +205,6 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
 
     return () => {
       cancelled = true;
-      if (channel && supabase) {
-        void supabase.removeChannel(channel);
-      }
     };
   }, [playerId]);
 

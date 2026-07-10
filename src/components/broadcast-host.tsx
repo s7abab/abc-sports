@@ -3,8 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { ExternalLink, X } from "lucide-react";
-
-import { createClient as createSupabaseBrowserClient } from "@/utils/supabase/client";
 import type { BroadcastMessage } from "@/lib/broadcast-storage";
 
 const DISMISS_PREFIX = "broadcast-dismissed";
@@ -233,43 +231,8 @@ export function BroadcastHost() {
 
     fetchBroadcast();
 
-    let supabase: ReturnType<typeof createSupabaseBrowserClient> | null = null;
-    let channel: ReturnType<ReturnType<typeof createSupabaseBrowserClient>["channel"]> | null = null;
-
-    try {
-      supabase = createSupabaseBrowserClient();
-      channel = supabase
-        .channel("broadcast-message")
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "broadcast_messages", filter: "id=eq.singleton" },
-          (payload) => {
-            if (payload.eventType === "DELETE") {
-              applyBroadcast(null);
-              return;
-            }
-
-            applyBroadcast(normalizeBroadcast(payload.new));
-          }
-        )
-        .subscribe((status, err) => {
-          if (err) {
-            console.error("Broadcast realtime subscription error:", err);
-          }
-
-          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-            console.error(`Broadcast realtime channel failed with status: ${status}.`);
-          }
-        });
-    } catch (error) {
-      console.error("Failed to initialize broadcast realtime subscription:", error);
-    }
-
     return () => {
       cancelled = true;
-      if (channel && supabase) {
-        void supabase.removeChannel(channel);
-      }
     };
   }, [shouldRender]);
 
