@@ -94,6 +94,13 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
       }
     }, [objectFit]);
 
+    useEffect(() => {
+      if (typeof window === "undefined") return;
+      if (window.matchMedia("(max-width: 640px), (pointer: coarse)").matches) {
+        setObjectFit("fill");
+      }
+    }, []);
+
     useImperativeHandle(ref, () => playerRef.current!);
 
     const { waiting, error, canPlay, currentTime, bufferedEnd, seekableEnd } = useMediaStore(playerRef);
