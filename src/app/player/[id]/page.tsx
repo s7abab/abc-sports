@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AdaptiveStreamPlayer } from "@/components/adaptive-stream-player";
-import { ArrowLeft, Loader2, Radio, ShieldCheck, WifiOff } from "lucide-react";
+import { ArrowLeft, Loader2, Radio, WifiOff } from "lucide-react";
 import type { MediaPlayerInstance } from "@vidstack/react";
 
 interface PlayerConfig {
@@ -113,18 +113,6 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
   const [whatsappUrl, setWhatsappUrl] = useState("");
   const videoPlayerRef = React.useRef<MediaPlayerInstance>(null);
   const activeServerIdRef = useRef<string | null>(null);
-  const [isAutoSwitchEnabled, setIsAutoSwitchEnabled] = useState<boolean>(() => {
-    if (typeof window === "undefined") {
-      return true;
-    }
-
-    return localStorage.getItem("auto_switch_server_enabled") !== "false";
-  });
-  const toggleAutoSwitch = () => {
-    const next = !isAutoSwitchEnabled;
-    setIsAutoSwitchEnabled(next);
-    localStorage.setItem("auto_switch_server_enabled", String(next));
-  };
 
   useEffect(() => {
     activeServerIdRef.current = activeServerId;
@@ -291,11 +279,9 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
                   isIframe={currentServer?.isIframe === true}
                   blockIframePopups={currentServer?.blockPopups !== false}
                   autoPlay={true}
-                  playerId={playerId}
                   servers={availableServers}
                   activeServerId={activeServerId}
                   onServerChange={switchServer}
-                  isAutoSwitchEnabled={isAutoSwitchEnabled}
                 />
               </div>
             </div>
@@ -356,49 +342,6 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
                     </button>
                   ))}
                 </div>
-
-                <button
-                  type="button"
-                  onClick={toggleAutoSwitch}
-                  className="mt-3 flex w-full items-center justify-between gap-3 rounded-2xl border border-white/[0.07] bg-black/25 px-3 py-2.5 text-left transition hover:border-violet-400/25 hover:bg-white/[0.05] active:scale-[0.99]"
-                  aria-pressed={isAutoSwitchEnabled}
-                  aria-label="Toggle automatic server switching"
-                >
-                  <div className="flex min-w-0 items-center gap-2.5">
-                    <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-violet-500/10 text-violet-200">
-                      <ShieldCheck className="h-3.5 w-3.5" />
-                    </div>
-                    <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold uppercase tracking-wider text-white">
-                      Auto-Switch Stream
-                      <span className="rounded-full border border-amber-400/25 bg-amber-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-amber-200">
-                        Beta
-                      </span>
-                    </span>
-                  </div>
-
-                  <div className="flex shrink-0 items-center gap-2">
-                    <span
-                      className={`hidden text-[10px] font-black uppercase tracking-wider sm:inline ${
-                        isAutoSwitchEnabled ? "text-violet-200" : "text-slate-500"
-                      }`}
-                    >
-                      {isAutoSwitchEnabled ? "On" : "Off"}
-                    </span>
-                    <span
-                      className={`relative inline-flex h-6 w-11 rounded-full border transition ${
-                        isAutoSwitchEnabled
-                          ? "border-violet-400/30 bg-violet-500"
-                          : "border-white/10 bg-slate-800"
-                      }`}
-                    >
-                      <span
-                        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${
-                          isAutoSwitchEnabled ? "translate-x-5" : "translate-x-0.5"
-                        }`}
-                      />
-                    </span>
-                  </div>
-                </button>
 
               </div>
             </div>

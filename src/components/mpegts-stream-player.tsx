@@ -16,6 +16,9 @@ type MpegtsPlayer = {
   attachMediaElement(mediaElement: HTMLVideoElement): void;
   load(): void;
   play(): Promise<void> | void;
+  pause?: () => void;
+  unload?: () => void;
+  detachMediaElement?: () => void;
   destroy(): void;
   on?: (event: string, listener: (...args: unknown[]) => void) => void;
   off?: (event: string, listener: (...args: unknown[]) => void) => void;
@@ -26,10 +29,22 @@ type MpegtsModuleLike = {
     isSupported(): boolean;
     createPlayer(mediaDataSource: Record<string, unknown>, config?: Record<string, unknown>): MpegtsPlayer;
     Events: { ERROR: string };
+    LoggingControl?: {
+      enableWarn: boolean;
+      enableInfo: boolean;
+      enableDebug: boolean;
+      enableVerbose: boolean;
+    };
   };
   isSupported(): boolean;
   createPlayer(mediaDataSource: Record<string, unknown>, config?: Record<string, unknown>): MpegtsPlayer;
   Events: { ERROR: string };
+  LoggingControl?: {
+    enableWarn: boolean;
+    enableInfo: boolean;
+    enableDebug: boolean;
+    enableVerbose: boolean;
+  };
 };
 
 const SLOT_COUNT = 2;
@@ -74,6 +89,9 @@ export function MpegtsStreamPlayer({
     playerRefs.current[slot] = null;
 
     try {
+      player?.pause?.();
+      player?.unload?.();
+      player?.detachMediaElement?.();
       player?.destroy();
     } catch {
       // Ignore cleanup errors.
@@ -130,6 +148,10 @@ export function MpegtsStreamPlayer({
       if (!isCurrentSource() || nextSlot === frontSlotRef.current) return;
 
       const previousSlot = frontSlotRef.current;
+      const previousVideo = videoRefs.current[previousSlot];
+      if (previousVideo && document.activeElement === previousVideo) {
+        previousVideo.blur();
+      }
       frontSlotRef.current = nextSlot;
       setFrontSlot(nextSlot);
       setActiveReady(true);
@@ -139,7 +161,7 @@ export function MpegtsStreamPlayer({
       cleanupTimerRef.current = window.setTimeout(() => {
         if (!isCurrentSource()) return;
         cleanupSlot(previousSlot);
-      }, 500);
+      }, 2000);
 
       scheduleNextPreload();
     };
@@ -197,10 +219,18 @@ export function MpegtsStreamPlayer({
       const mod = await import("mpegts.js");
       const mpegtsModule = mod as unknown as MpegtsModuleLike;
       const mpegts = mpegtsModule.default ?? mpegtsModule;
+      const loggingControl = mpegts.LoggingControl ?? mpegtsModule.LoggingControl;
 
       if (!mpegts?.isSupported?.()) {
         setErrorMessage("This browser cannot play MPEG-TS streams.");
         return null;
+      }
+
+      if (loggingControl) {
+        loggingControl.enableWarn = false;
+        loggingControl.enableInfo = false;
+        loggingControl.enableDebug = false;
+        loggingControl.enableVerbose = false;
       }
 
       const player = mpegts.createPlayer(
@@ -215,7 +245,8 @@ export function MpegtsStreamPlayer({
           isLive: true,
           enableWorker: true,
           enableWorkerForMSE: true,
-          enableStashBuffer: false,
+          enableStashBuffer: true,
+          stashInitialSize: 512 * 1024,
           lazyLoad: false,
           autoCleanupSourceBuffer: true,
           referrerPolicy: "no-referrer-when-downgrade",
@@ -301,10 +332,11 @@ export function MpegtsStreamPlayer({
             videoRefs.current[slot] = element;
           }}
           aria-label={slot === frontSlot ? title : undefined}
-          aria-hidden={slot !== frontSlot}
           tabIndex={slot === frontSlot ? 0 : -1}
           className={`absolute inset-0 h-full w-full bg-black transition-opacity duration-300 ${
-            slot === frontSlot ? "opacity-100" : "opacity-0"
+            slot === frontSlot
+              ? "z-10 opacity-100 pointer-events-auto"
+              : "z-0 opacity-0 pointer-events-none"
           }`}
           controls={slot === frontSlot}
           muted={muted}

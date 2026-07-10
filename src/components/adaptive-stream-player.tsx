@@ -16,11 +16,9 @@ interface AdaptiveStreamPlayerProps {
   blockIframePopups?: boolean;
   autoPlay?: boolean;
   muted?: boolean;
-  playerId?: string;
   servers?: Array<{ id: StreamServerId; name: string }>;
   activeServerId?: StreamServerId | null;
   onServerChange?: (id: StreamServerId) => void;
-  isAutoSwitchEnabled?: boolean;
 }
 
 function looksLikeHlsPath(src: string) {
@@ -55,11 +53,9 @@ export const AdaptiveStreamPlayer = forwardRef<MediaPlayerInstance, AdaptiveStre
       blockIframePopups = true,
       autoPlay = true,
       muted = false,
-      playerId,
       servers = [],
       activeServerId,
       onServerChange,
-      isAutoSwitchEnabled = true,
     },
     ref
   ) => {
@@ -164,11 +160,9 @@ export const AdaptiveStreamPlayer = forwardRef<MediaPlayerInstance, AdaptiveStre
         title={title}
         autoPlay={autoPlay}
         muted={muted}
-        playerId={playerId}
         servers={servers}
         activeServerId={activeServerId}
         onServerChange={onServerChange}
-        isAutoSwitchEnabled={isAutoSwitchEnabled}
       />
     );
   }

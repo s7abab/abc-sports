@@ -1,4 +1,4 @@
-const CACHE_VERSION = "abc-sports-pwa-v2";
+const CACHE_VERSION = "abc-sports-pwa-v4";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const OFFLINE_URL = "/offline";
 const PRECACHE_URLS = [
