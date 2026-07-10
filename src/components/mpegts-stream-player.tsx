@@ -32,6 +32,8 @@ type MpegtsModuleLike = {
   Events: { ERROR: string };
 };
 
+const MPEGTS_REFRESH_BEFORE_MS = 4 * 60_000 + 30_000;
+
 export function MpegtsStreamPlayer({
   src,
   title,
@@ -42,10 +44,25 @@ export function MpegtsStreamPlayer({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [isReady, setIsReady] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     let player: MpegtsPlayer | null = null;
+    let refreshTimer: number | null = null;
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) {
+        window.clearTimeout(refreshTimer);
+      }
+
+      refreshTimer = window.setTimeout(() => {
+        if (cancelled) return;
+        setIsReady(false);
+        setErrorMessage("");
+        setReloadToken((current) => current + 1);
+      }, MPEGTS_REFRESH_BEFORE_MS);
+    };
 
     async function initPlayer() {
       try {
@@ -87,6 +104,7 @@ export function MpegtsStreamPlayer({
         nextPlayer.on?.(mpegts.Events.ERROR, handleError);
         nextPlayer.attachMediaElement(videoEl);
         nextPlayer.load();
+        scheduleRefresh();
         if (!cancelled) {
           setIsReady(true);
         }
@@ -111,8 +129,11 @@ export function MpegtsStreamPlayer({
       } catch {
         // Ignore cleanup errors.
       }
+      if (refreshTimer) {
+        window.clearTimeout(refreshTimer);
+      }
     };
-  }, [autoPlay, src]);
+  }, [autoPlay, reloadToken, src]);
 
   if (errorMessage) {
     return (
