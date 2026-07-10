@@ -73,9 +73,11 @@ const PIPToggle = () => {
 export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
   ({ src, title, isIframe = false, blockIframePopups = true, thumbnails, onPlay, onPause, children, muted = false, autoPlay = false, servers = [], activeServerId, onServerChange }, ref) => {
     const playableSrc = resolvePlayableSrc(src, isIframe);
-    const [objectFit, setObjectFit] = useState<"contain" | "cover" | "fill">(() => {
+    const [objectFit, setObjectFit] = useState<"contain" | "fill">(() => {
       if (typeof window === "undefined") return "contain";
-      return window.matchMedia("(max-width: 640px), (pointer: coarse)").matches ? "fill" : "contain";
+      const isMobileViewport =
+        window.matchMedia("(max-width: 768px)").matches || window.matchMedia("(pointer: coarse)").matches;
+      return isMobileViewport ? "fill" : "contain";
     });
     const [isServerMenuOpen, setIsServerMenuOpen] = useState(false);
     const playerRef = useRef<MediaPlayerInstance>(null);
@@ -93,13 +95,6 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
         rawEl.setAttribute("data-fit", objectFit);
       }
     }, [objectFit]);
-
-    useEffect(() => {
-      if (typeof window === "undefined") return;
-      if (window.matchMedia("(max-width: 640px), (pointer: coarse)").matches) {
-        setObjectFit("fill");
-      }
-    }, []);
 
     useImperativeHandle(ref, () => playerRef.current!);
 
@@ -144,11 +139,7 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
     }, [canPlay, playableSrc]);
 
     const toggleFit = () => {
-      setObjectFit((prev) => {
-        if (prev === "contain") return "cover";
-        if (prev === "cover") return "fill";
-        return "contain";
-      });
+      setObjectFit((prev) => (prev === "contain" ? "fill" : "contain"));
     };
 
     if (isIframe) {
@@ -307,19 +298,9 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
                   <button
                     onClick={toggleFit}
                     className={`vds-button h-full aspect-square flex items-center justify-center transition-colors duration-150 mr-1.5 cursor-pointer ${
-                      objectFit === "cover"
-                        ? "text-emerald-400 hover:text-emerald-300"
-                        : objectFit === "fill"
-                          ? "text-violet-400 hover:text-violet-300"
-                          : "text-slate-300 hover:text-white"
+                      objectFit === "fill" ? "text-violet-400 hover:text-violet-300" : "text-slate-300 hover:text-white"
                     }`}
-                    title={
-                      objectFit === "contain"
-                        ? "Fit Screen (Letterbox)"
-                        : objectFit === "cover"
-                          ? "Zoom to Fill (Crop)"
-                          : "Stretch to Fill (Distort)"
-                    }
+                    title={objectFit === "contain" ? "Stretch to Fill" : "Fit to Screen"}
                     aria-label="Toggle scaling mode"
                   >
                     <Crop className="w-[18px] h-[18px]" />
