@@ -6,6 +6,8 @@ import { AdaptiveStreamPlayer } from "@/components/adaptive-stream-player";
 import { ArrowLeft, Loader2, Radio, WifiOff } from "lucide-react";
 import type { MediaPlayerInstance } from "@vidstack/react";
 
+const BLOG_URL = "https://abcsports7.blogspot.com";
+
 interface PlayerConfig {
   id: string;
   name: string;
@@ -228,13 +230,13 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
 
       <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col gap-2 px-4 pb-3 pt-0 sm:px-6 sm:pb-4 sm:pt-0 lg:px-8">
         <header className="flex items-center rounded-2xl border border-white/[0.07] bg-white/[0.035] p-1.5 shadow-xl shadow-black/20 backdrop-blur-md sm:p-2">
-          <Link
-            href="/"
+          <a
+            href={BLOG_URL}
             className="inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-xl border border-white/10 bg-black/40 px-2 text-[10px] font-bold uppercase tracking-wide text-slate-200 shadow-lg shadow-black/20 transition hover:border-white/20 hover:bg-white/10 hover:text-white active:scale-95"
           >
             <ArrowLeft className="h-3 w-3" />
             <span>Back</span>
-          </Link>
+          </a>
         </header>
 
         {isLoading ? (
@@ -260,7 +262,7 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
                 <p className="mt-2 text-sm leading-6 text-rose-100/80">{error}</p>
               </div>
               <Link
-                href="/"
+                href={BLOG_URL}
                 className="inline-flex h-11 items-center justify-center rounded-full border border-white/10 bg-white/5 px-5 text-xs font-bold uppercase tracking-wider text-slate-200 transition hover:bg-white/10 hover:text-white"
               >
                 Return home
@@ -353,13 +355,13 @@ export default function SinglePlayerPage({ params }: { params: Promise<{ id: str
                 <WifiOff className="h-8 w-8 text-slate-500" />
               </div>
               <div>
-                <h2 className="text-xl font-black text-white">Channel offline</h2>
+                <h2 className="text-xl font-black text-white">Channel unavailable</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-400">
-                  No live stream source is configured for this player right now. Check back later or open another match from the home page.
+                  No live stream source is configured for this player right now. Check back later or open another match from the main site.
                 </p>
               </div>
               <Link
-                href="/"
+                href={BLOG_URL}
                 className="inline-flex h-11 items-center justify-center rounded-full border border-white/10 bg-white/5 px-5 text-xs font-bold uppercase tracking-wider text-slate-200 transition hover:bg-white/10 hover:text-white"
               >
                 Browse matches

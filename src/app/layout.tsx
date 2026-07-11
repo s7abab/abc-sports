@@ -1,9 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
-import { Analytics } from "@vercel/analytics/next";
-import { PwaInstallPrompt } from "@/components/pwa-install-prompt";
-import { PwaOfflineSync } from "@/components/pwa-offline-sync";
-import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
 import "./globals.css";
 
 const geistSans = localFont({
@@ -19,19 +15,10 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  applicationName: "ABC Sports",
   title: "ABC Sports | Live Streaming Home",
   description: "A modern sports streaming home for featured fixtures and live match browsing.",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "ABC Sports",
-  },
   formatDetection: {
     telephone: false,
-  },
-  icons: {
-    apple: "/apple-touch-icon.png",
   },
 };
 
@@ -48,10 +35,6 @@ export default function RootLayout({
     <html lang="en" className={`h-full antialiased ${geistSans.variable} ${geistMono.variable}`}>
       <body className="min-h-full flex flex-col bg-[#06070b] text-slate-100">
         {children}
-        <ServiceWorkerRegistration />
-        <PwaInstallPrompt />
-        <PwaOfflineSync />
-        <Analytics />
       </body>
     </html>
   );

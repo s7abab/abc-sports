@@ -8,12 +8,10 @@ import {
   useMediaState,
   type MediaPlayerInstance,
   type MediaProviderAdapter,
-  useMediaStore,
 } from "@vidstack/react";
 import { defaultLayoutIcons, DefaultVideoLayout } from "@vidstack/react/player/layouts/default";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { Crop, RefreshCw, Server, AlertTriangle } from "lucide-react";
-import { useLiveStreamController } from "@/hooks/use-live-stream-controller";
+import { Crop, Server } from "lucide-react";
 import type { StreamServerId } from "@/lib/stream-health";
 
 interface VideoPlayerProps {
@@ -98,45 +96,9 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
 
     useImperativeHandle(ref, () => playerRef.current!);
 
-    const { waiting, error, canPlay, currentTime, bufferedEnd, seekableEnd } = useMediaStore(playerRef);
-    const [loadingTimeout, setLoadingTimeout] = useState(false);
-    const [userClickedShowOverlay, setUserClickedShowOverlay] = useState(false);
-
-    const { handleManualServerChange, handleRefresh, recordHlsError, sourceVersion, statusMessage, statusTitle } =
-      useLiveStreamController({
-        src,
-        playerRef,
-        activeServerId: activeServerId ?? null,
-        onServerChange,
-        canPlay,
-        waiting,
-        error,
-        currentTime,
-        bufferedEnd,
-        seekableEnd,
-      });
-
-    useEffect(() => {
-      if (canPlay) {
-        const resetTimer = window.setTimeout(() => {
-          setLoadingTimeout(false);
-          setUserClickedShowOverlay(false);
-        }, 0);
-        return () => window.clearTimeout(resetTimer);
-      }
-
-      const resetTimer = window.setTimeout(() => {
-        setLoadingTimeout(false);
-      }, 0);
-      const timer = window.setTimeout(() => {
-        setLoadingTimeout(true);
-      }, 2500);
-
-      return () => {
-        window.clearTimeout(resetTimer);
-        window.clearTimeout(timer);
-      };
-    }, [canPlay, playableSrc]);
+    const handleManualServerChange = (serverId: StreamServerId) => {
+      onServerChange?.(serverId);
+    };
 
     const toggleFit = () => {
       setObjectFit((prev) => (prev === "contain" ? "fill" : "contain"));
@@ -186,34 +148,15 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
           nudgeOffset: 0.2,
           nudgeMaxRetry: 5,
         };
-
-        provider.onInstance((hls) => {
-          const hlsAny = hls as unknown as {
-            on?: (event: string, callback: (_event: string, data: unknown) => void) => void;
-            off?: (event: string, callback: (_event: string, data: unknown) => void) => void;
-          };
-
-          const onError = (_event: string, data: unknown) => {
-            recordHlsError(data as { fatal?: boolean; type?: string; details?: string });
-          };
-
-          hlsAny.on?.("hlsError", onError);
-          return () => hlsAny.off?.("hlsError", onError);
-        });
       }
     };
 
     return (
       <div
-        onClick={() => {
-          if (!canPlay) {
-            setUserClickedShowOverlay(true);
-          }
-        }}
         className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black/95 border border-white/10 shadow-2xl backdrop-blur-md transition-all duration-300 hover:border-violet-500/30 group"
       >
         <MediaPlayer
-          key={`${activeServerId ?? sourceVersion}:${sourceVersion}`}
+          key={activeServerId ?? playableSrc}
           className="w-full h-full select-none outline-none relative"
           title={title}
           src={playableSrc}
@@ -309,69 +252,6 @@ export const VideoPlayer = forwardRef<MediaPlayerInstance, VideoPlayerProps>(
               ),
             }}
           />
-
-          {!canPlay && (loadingTimeout || error || userClickedShowOverlay) && (
-            <div
-              onClick={(e) => e.stopPropagation()}
-              className="absolute inset-0 flex flex-col items-center justify-start sm:justify-center bg-black/90 backdrop-blur-sm z-40 animate-in fade-in duration-300 px-3 py-2.5 sm:p-6 text-center select-none pointer-events-auto overflow-y-auto"
-            >
-              <div className="w-full max-w-[92vw] sm:max-w-sm shrink-0">
-                <div className="mx-auto w-9 h-9 sm:w-16 sm:h-16 rounded-full bg-violet-500/10 flex items-center justify-center mb-1.5 sm:mb-4 animate-pulse">
-                  {error ? (
-                    <AlertTriangle className="w-5 h-5 sm:w-8 sm:h-8 text-rose-500" />
-                  ) : (
-                    <div className="h-5 w-5 sm:h-8 sm:w-8 rounded-full border-2 border-violet-400 border-t-transparent animate-spin" />
-                  )}
-                </div>
-
-                <h3 className="text-[13px] sm:text-base md:text-lg font-bold text-slate-100 mb-1 sm:mb-2 text-balance leading-tight">
-                  {statusTitle}
-                </h3>
-
-                <p className="text-[10px] sm:text-xs md:text-sm text-slate-400 mb-2.5 sm:mb-6 leading-snug sm:leading-relaxed text-balance">
-                  <span className="sm:hidden">{statusMessage}</span>
-                  <span className="hidden sm:inline">{statusMessage}</span>
-                </p>
-              </div>
-
-              {servers.length > 0 && (
-                <div className="mb-2.5 sm:mb-6 w-full max-w-xs flex flex-col gap-1.5 sm:gap-2 shrink-0">
-                  <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider select-none">
-                    Select Stream Server
-                  </span>
-                  <div className="flex flex-wrap gap-1.5 sm:gap-2 justify-center">
-                    {servers.map((srv) => (
-                      <button
-                        key={srv.id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleManualServerChange(srv.id);
-                        }}
-                        className={`px-2.5 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs font-semibold rounded-lg sm:rounded-xl border transition-all duration-200 cursor-pointer max-w-[8rem] truncate ${
-                          activeServerId === srv.id
-                            ? "bg-violet-600 border-violet-500 text-white shadow-lg shadow-violet-600/20"
-                            : "bg-white/5 border-white/10 text-slate-300 hover:text-white hover:bg-white/10"
-                        }`}
-                      >
-                        {srv.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="flex flex-row sm:flex-row items-center justify-center gap-2 sm:gap-3 w-full sm:w-auto shrink-0">
-                <button
-                  onClick={handleRefresh}
-                  className="flex min-w-0 flex-1 sm:flex-none sm:w-auto items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-violet-600 hover:bg-violet-500 active:scale-95 text-white text-[10px] sm:text-xs md:text-sm font-semibold rounded-lg sm:rounded-xl transition-all duration-200 shadow-lg shadow-violet-600/20 group cursor-pointer"
-                >
-                  <RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-500 group-hover:rotate-180" />
-                  <span className="truncate">Refresh</span>
-                </button>
-              </div>
-            </div>
-          )}
-
           {children}
         </MediaPlayer>
       </div>

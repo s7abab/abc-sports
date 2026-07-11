@@ -17,7 +17,7 @@ export default function NotFound() {
         </h1>
         <p className="mt-4 text-sm leading-6 text-slate-300">
           The link may be outdated, or the app may have been opened on a path that is no longer
-          available. Return home or open the offline page if the connection is unstable.
+          available. Return home to continue browsing.
         </p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
           <Link
@@ -25,12 +25,6 @@ export default function NotFound() {
             className="inline-flex items-center justify-center rounded-full bg-white px-6 py-3 text-sm font-black text-slate-950 transition hover:scale-[1.02] hover:bg-red-100"
           >
             Go home
-          </Link>
-          <Link
-            href="/offline"
-            className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 px-6 py-3 text-sm font-black text-slate-100 transition hover:scale-[1.02] hover:bg-white/10"
-          >
-            Open offline page
           </Link>
         </div>
       </section>

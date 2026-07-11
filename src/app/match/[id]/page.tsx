@@ -2,16 +2,11 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { notFound, useRouter } from "next/navigation";
+import { notFound } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
 import type { MatchConfig } from "@/lib/match-storage";
-import {
-  deriveRuntimeMatchStatus,
-  formatMatchDate,
-  getMatchLiveStart,
-} from "@/lib/match-utils";
-import { MatchCountdown } from "./countdown";
+import { deriveRuntimeMatchStatus, formatMatchDate } from "@/lib/match-utils";
 
 function TeamLogo({
   name,
@@ -68,7 +63,6 @@ export default function MatchDetailsPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const router = useRouter();
   const { id } = React.use(params);
 
   const [match, setMatch] = useState<MatchConfig | null>(null);
@@ -88,7 +82,7 @@ export default function MatchDetailsPage({
         } else {
           setError("Failed to load match details.");
         }
-      } catch (err) {
+      } catch {
         setError("An error occurred while loading match details.");
       } finally {
         setIsLoading(false);
@@ -102,8 +96,8 @@ export default function MatchDetailsPage({
           const data = await response.json();
           setWhatsappUrl(data.whatsappUrl || "");
         }
-      } catch (err) {
-        console.error("Error loading settings:", err);
+      } catch {
+        console.error("Error loading settings");
       }
     }
 
@@ -114,14 +108,6 @@ export default function MatchDetailsPage({
   const status = match
     ? (match.live ? "live" : (match.status === "completed" ? "completed" : deriveRuntimeMatchStatus(match.date)))
     : null;
-  const playerHref = match ? `/player/${match.playerId}` : "";
-
-  // Auto redirect if match is live
-  useEffect(() => {
-    if (status === "live" && playerHref) {
-      router.replace(playerHref);
-    }
-  }, [status, playerHref, router]);
 
   if (error === "not-found") {
     notFound();
@@ -148,8 +134,6 @@ export default function MatchDetailsPage({
       </main>
     );
   }
-
-  const liveStart = getMatchLiveStart(match.date);
 
   return (
     <main className="relative min-h-screen bg-[#09090b] px-4 pt-6 sm:pt-8 pb-12 text-slate-100 sm:px-6 lg:px-8 font-sans flex flex-col items-center overflow-x-hidden selection:bg-violet-500/20 selection:text-white">
@@ -208,13 +192,6 @@ export default function MatchDetailsPage({
               >
                 Back to Schedule
               </Link>
-            </div>
-          ) : liveStart ? (
-            <div className="mt-10 border-t border-white/[0.05] pt-8">
-              <p className="mb-5 text-xs font-semibold uppercase tracking-widest text-zinc-500">
-                Live Stream Starts In
-              </p>
-              <MatchCountdown liveStartTime={liveStart.getTime()} playerHref={playerHref} />
             </div>
           ) : null}
 

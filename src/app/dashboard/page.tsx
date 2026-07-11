@@ -11,7 +11,6 @@ import {
   getLocalDateKey,
   type MatchStatus,
 } from "@/lib/match-utils";
-import { queuedFetch } from "@/lib/pwa-offline-queue";
 import { Tv, Sparkles, Loader2, Copy, Check, Settings, Save, ExternalLink, X, Plus, CalendarPlus, Pencil, Trash2, RotateCcw, Megaphone, Send, Image as ImageIcon } from "lucide-react";
 
 interface PlayerServer {
@@ -29,11 +28,6 @@ interface PlayerConfig {
   primaryServer: string;
   servers: PlayerServers;
 }
-
-type QueuedApiResponse = {
-  queued?: boolean;
-  message?: string;
-};
 
 const DEFAULT_SERVER_SLOT_COUNT = 4;
 
@@ -181,8 +175,8 @@ export default function DashboardPage() {
           const data = await response.json();
           setPlayers(data);
         }
-      } catch (err) {
-        console.error("Error loading players:", err);
+      } catch {
+        console.error("Error loading players:");
       } finally {
         setIsLoading(false);
       }
@@ -195,8 +189,8 @@ export default function DashboardPage() {
           const data = await response.json();
           setMatches(data);
         }
-      } catch (err) {
-        console.error("Error loading matches:", err);
+      } catch {
+        console.error("Error loading matches:");
       } finally {
         setIsMatchesLoading(false);
       }
@@ -209,8 +203,8 @@ export default function DashboardPage() {
           const data = await response.json();
           setWhatsappUrl(data.whatsappUrl || "");
         }
-      } catch (err) {
-        console.error("Error loading settings:", err);
+      } catch {
+        console.error("Error loading settings:");
       }
     }
 
@@ -232,8 +226,8 @@ export default function DashboardPage() {
         setBroadcastActionUrl(data.actionUrl || "");
         setBroadcastImageUrls([data.imageUrls?.[0] || "", data.imageUrls?.[1] || "", data.imageUrls?.[2] || ""]);
         setBroadcastIsActive(Boolean(data.isActive));
-      } catch (err) {
-        console.error("Error loading broadcast message:", err);
+      } catch {
+        console.error("Error loading broadcast message:");
       }
     }
 
@@ -241,15 +235,6 @@ export default function DashboardPage() {
     fetchMatches();
     fetchSettings();
     fetchBroadcast();
-
-    const shared = new URLSearchParams(window.location.search).get("shared");
-    if (shared) {
-      queueMicrotask(() => {
-        setActiveTab("settings");
-        setBroadcastDescription((current) => current || shared);
-        setBroadcastTitle((current) => current || "Shared update");
-      });
-    }
   }, []);
 
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -274,23 +259,20 @@ export default function DashboardPage() {
     }
 
     try {
-      const response = await queuedFetch("/api/settings", {
+      const response = await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ whatsappUrl }),
       });
 
       if (response.ok) {
-        const data = (await response.json().catch(() => ({}))) as QueuedApiResponse;
-        if (data.queued) {
-          setSettingsError(data.message || "Saved offline. Settings will sync when the connection returns.");
-        }
         setSettingsSuccess(true);
         setTimeout(() => setSettingsSuccess(false), 3000);
       } else {
-        setSettingsError("Failed to save settings.");
+        const data = await response.json().catch(() => ({}));
+        setSettingsError(data.error || "Failed to save settings.");
       }
-    } catch (err) {
+    } catch {
       setSettingsError("An error occurred while saving settings.");
     } finally {
       setIsSavingSettings(false);
@@ -347,7 +329,7 @@ export default function DashboardPage() {
     }
 
     try {
-      const response = await queuedFetch("/api/broadcast", {
+      const response = await fetch("/api/broadcast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -362,7 +344,7 @@ export default function DashboardPage() {
       });
 
       if (response.ok) {
-        const data = (await response.json()) as { broadcast?: BroadcastMessage } & QueuedApiResponse;
+        const data = (await response.json()) as { broadcast?: BroadcastMessage };
         if (data.broadcast) {
           setBroadcastTitle(data.broadcast.title || "");
           setBroadcastDescription(data.broadcast.description || "");
@@ -376,16 +358,13 @@ export default function DashboardPage() {
           ]);
           setBroadcastIsActive(Boolean(data.broadcast.isActive));
         }
-        if (data.queued) {
-          setBroadcastError(data.message || "Saved offline. Broadcast will sync when the connection returns.");
-        }
         setBroadcastSuccess(true);
         setTimeout(() => setBroadcastSuccess(false), 3000);
       } else {
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
         setBroadcastError(data.error || "Failed to save broadcast message.");
       }
-    } catch (err) {
+    } catch {
       setBroadcastError("An error occurred while saving the broadcast message.");
     } finally {
       setIsSavingBroadcast(false);
@@ -398,21 +377,16 @@ export default function DashboardPage() {
     setIsSavingBroadcast(true);
 
     try {
-      const response = await queuedFetch("/api/broadcast", { method: "DELETE" });
+      const response = await fetch("/api/broadcast", { method: "DELETE" });
       if (!response.ok) {
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
         setBroadcastError(data.error || "Failed to disable broadcast message.");
         return;
-      }
-
-      const data = (await response.json().catch(() => ({}))) as QueuedApiResponse;
-      if (data.queued) {
-        setBroadcastError(data.message || "Saved offline. Broadcast disable will sync when the connection returns.");
       }
       setBroadcastIsActive(false);
       setBroadcastSuccess(true);
       setTimeout(() => setBroadcastSuccess(false), 3000);
-    } catch (err) {
+    } catch {
       setBroadcastError("An error occurred while disabling the broadcast message.");
     } finally {
       setIsSavingBroadcast(false);
@@ -534,7 +508,7 @@ export default function DashboardPage() {
           : p
       );
 
-      const response = await queuedFetch("/api/players", {
+      const response = await fetch("/api/players", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedPlayers),
@@ -544,10 +518,10 @@ export default function DashboardPage() {
         setPlayers(updatedPlayers);
         setEditingPlayer(null);
       } else {
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
         setSaveError(data.error || "Failed to save configuration.");
       }
-    } catch (err) {
+    } catch {
       setSaveError("An error occurred while saving.");
     } finally {
       setIsSaving(false);
@@ -703,7 +677,7 @@ export default function DashboardPage() {
         };
       });
 
-      const response = await queuedFetch("/api/players", {
+      const response = await fetch("/api/players", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedPlayers),
@@ -713,10 +687,10 @@ export default function DashboardPage() {
         setPlayers(updatedPlayers);
         setIsBulkEditOpen(false);
       } else {
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
         setSaveError(data.error || "Failed to save configurations.");
       }
-    } catch (err) {
+    } catch {
       setSaveError("An error occurred while saving configurations.");
     } finally {
       setIsSaving(false);
@@ -733,7 +707,7 @@ export default function DashboardPage() {
         p.id === playerId ? { ...p, primaryServer: slot } : p
       );
 
-      const response = await queuedFetch("/api/players", {
+      const response = await fetch("/api/players", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedPlayers),
@@ -742,8 +716,8 @@ export default function DashboardPage() {
       if (response.ok) {
         setPlayers(updatedPlayers);
       }
-    } catch (err) {
-      console.error("Error hot-swapping primary server:", err);
+    } catch {
+      console.error("Error hot-swapping primary server:");
     }
   };
 
@@ -813,25 +787,20 @@ export default function DashboardPage() {
     if (!confirmed) return;
 
     try {
-      const response = await queuedFetch(`/api/matches/${match.id}`, {
+      const response = await fetch(`/api/matches/${match.id}`, {
         method: "DELETE",
       });
 
       if (!response.ok) {
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
         setMatchError(data.error || "Failed to delete match.");
         return;
-      }
-
-      const data = (await response.json().catch(() => ({}))) as QueuedApiResponse;
-      if (data.queued) {
-        setMatchError(data.message || "Saved offline. Match deletion will sync when the connection returns.");
       }
       setMatches((prev) => prev.filter((item) => item.id !== match.id));
       if (editingMatch?.id === match.id) {
         handleStartNewMatch();
       }
-    } catch (err) {
+    } catch {
       setMatchError("An error occurred while deleting the match.");
     }
   };
@@ -862,7 +831,7 @@ export default function DashboardPage() {
     }
 
     try {
-      const response = await queuedFetch(
+      const response = await fetch(
         editingMatch ? `/api/matches/${editingMatch.id}` : "/api/matches",
         {
           method: editingMatch ? "PUT" : "POST",
@@ -872,21 +841,17 @@ export default function DashboardPage() {
       );
 
       if (!response.ok) {
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
         setMatchError(data.error || "Failed to save match.");
         return;
       }
 
-      const data = (await response.json()) as { match?: MatchConfig } & QueuedApiResponse;
+      const data = (await response.json()) as { match?: MatchConfig };
       const optimisticMatch: MatchConfig = data.match ?? {
         id: editingMatch?.id ?? `queued-${Date.now()}`,
         ...payload,
         status: payload.status as MatchStatus,
       };
-
-      if (data.queued) {
-        setMatchError(data.message || "Saved offline. Match change will sync when the connection returns.");
-      }
 
       setMatches((prev) =>
         editingMatch
@@ -905,7 +870,7 @@ export default function DashboardPage() {
         awayLogoUrl: "",
         status: "pending",
       });
-    } catch (err) {
+    } catch {
       setMatchError("An error occurred while saving the match.");
     } finally {
       setIsSavingMatch(false);
@@ -1054,7 +1019,7 @@ export default function DashboardPage() {
                       onClick={(e) => {
                         try {
                           e.currentTarget.showPicker();
-                        } catch (err) {}
+                        } catch {}
                       }}
                       className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition focus:border-violet-500/50 cursor-pointer"
                     />
@@ -1074,7 +1039,7 @@ export default function DashboardPage() {
                       onClick={(e) => {
                         try {
                           e.currentTarget.showPicker();
-                        } catch (err) {}
+                        } catch {}
                       }}
                       className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition focus:border-violet-500/50 cursor-pointer"
                     />
@@ -1432,7 +1397,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {/* Video Player or Offline Placeholder */}
+                {/* Video player or empty state */}
                 {activeStreamUrl ? (
                   <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
                     <AdaptiveStreamPlayer
